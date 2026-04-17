@@ -1,0 +1,1533 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Zerotrace AI | Zero Emissions. Zero Compromise.</title>
+  <meta name="description" content="Real Ollama telemetry — live CPU/GPU before vs after optimization.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,600;1,400&family=Space+Grotesk:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+
+<style>
+/* ── Root tokens ──────────────────────────────────────────── */
+:root {
+  --teal:   #3c7f72; --teal-l:  #5aad9d; --teal-glow: rgba(90,173,157,0.30);
+  --gold:   #ab8115; --gold-l:  #d4a832; --gold-glow:  rgba(212,168,50,0.30);
+  --rust:   #992800; --rust-l:  #c93a00; --rust-glow:  rgba(201,58,0,0.30);
+  --purple: #9b59b6; --purple-l:#b07dd4; --purple-glow:rgba(176,125,212,0.30);
+  --green:  #27ae60; --green-l: #2ecc71; --green-glow: rgba(46,204,113,0.30);
+  --bg:     #050807; --bg-card: rgba(11,18,14,0.85); --bg-panel:#090e0b;
+  --txt:    #f0f5f3; --txt-dim: #7a9e97; --border: rgba(60,127,114,0.20);
+  --r:      12px;
+  --font:   'Space Grotesk', sans-serif;
+  --mono:   'IBM Plex Mono', monospace;
+}
+*,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+html { scroll-behavior:smooth; }
+body { background:var(--bg); color:var(--txt); font-family:var(--font); overflow-x:hidden; }
+
+/* ── Atmosphere ──────────────────────────────────────────── */
+body::before {
+  content:""; position:fixed; inset:0; pointer-events:none; z-index:0;
+  background:radial-gradient(ellipse 80% 60% at 50% 0%,rgba(60,127,114,0.07) 0%,transparent 70%);
+}
+.scanlines {
+  position:fixed; inset:0; pointer-events:none; z-index:1;
+  background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(90,173,157,0.012) 2px,rgba(90,173,157,0.012) 4px);
+}
+#three-bg { position:fixed; inset:0; z-index:-1; opacity:0; animation:fadeIn 1.6s ease-in forwards; }
+
+/* ── Layout ──────────────────────────────────────────────── */
+.ui-wrap { position:relative; z-index:2; pointer-events:none; }
+.ui-wrap > * { pointer-events:auto; }
+.container { max-width:1400px; margin:0 auto; padding:2rem 1.5rem; display:flex; flex-direction:column; gap:3rem; position:relative; z-index:10; }
+
+/* ── Header ──────────────────────────────────────────────── */
+header {
+  position:fixed; top:0; left:0; width:100%; z-index:200;
+  background:rgba(5,8,7,0.80); backdrop-filter:blur(24px); -webkit-backdrop-filter:blur(24px);
+  border-bottom:1px solid rgba(60,127,114,0.12);
+  padding:.9rem 2.5rem;
+  display:flex; justify-content:space-between; align-items:center;
+  box-shadow:0 4px 40px rgba(0,0,0,0.5);
+  animation:slideDown .5s ease .1s backwards;
+}
+.logo { display:flex; align-items:center; gap:10px; font-weight:700; font-size:1.1rem; letter-spacing:1.5px; text-transform:uppercase; }
+.logo svg { filter:drop-shadow(0 0 6px var(--teal-glow)); }
+.header-center { display:flex; align-items:center; gap:1rem; }
+#api-status { display:flex; align-items:center; gap:8px; font-size:.78rem; font-weight:600; color:var(--teal-l); background:rgba(90,173,157,0.08); padding:5px 14px; border-radius:20px; border:1px solid rgba(90,173,157,0.15); letter-spacing:1px; transition:all .3s; }
+.blink-dot { width:7px; height:7px; border-radius:50%; background:currentColor; animation:pulse 1.5s infinite; }
+.header-right { font-family:var(--mono); font-size:.78rem; color:var(--txt-dim); display:flex; gap:1.8rem; align-items:center; }
+
+/* ── Global Radar Badge ──────────────────────────────────── */
+#global-radar {
+  display:flex; align-items:center; gap:8px; font-size:.78rem; font-weight:700;
+  color:var(--txt-dim); background:rgba(255,255,255,0.05); padding:5px 14px;
+  border-radius:20px; border:1px solid rgba(255,255,255,0.1); letter-spacing:1px; transition:all .3s;
+}
+#radar-dot { width:7px; height:7px; border-radius:50%; background:currentColor; transition:all .3s; }
+#global-radar.radar-running {
+  color: var(--green-l); background: rgba(46,204,113,0.1);
+  border-color: rgba(46,204,113,0.3); box-shadow: 0 0 15px rgba(46,204,113,0.2);
+}
+#global-radar.radar-running #radar-dot {
+  background: var(--green-l); box-shadow: 0 0 8px var(--green-l); animation: pulse 1s infinite;
+}
+
+/* ── Connected model pill (header) ──────────────────────── */
+#model-pill {
+  display:none; align-items:center; gap:8px;
+  background:rgba(46,204,113,0.10); border:1px solid rgba(46,204,113,0.25);
+  border-radius:20px; padding:5px 14px;
+  font-size:.78rem; font-weight:700; color:var(--green-l);
+  letter-spacing:1px; animation:none;
+}
+#model-pill.visible { display:flex; }
+#model-pill .live-ring {
+  width:8px; height:8px; border-radius:50%;
+  background:var(--green-l);
+  box-shadow:0 0 0 0 rgba(46,204,113,0.6);
+  animation:livePing 1.4s ease-out infinite;
+}
+@keyframes livePing {
+  0%   { box-shadow:0 0 0 0 rgba(46,204,113,0.6); }
+  70%  { box-shadow:0 0 0 8px rgba(46,204,113,0); }
+  100% { box-shadow:0 0 0 0 rgba(46,204,113,0); }
+}
+
+/* ── Hero ────────────────────────────────────────────────── */
+.hero-container { width:100%; min-height:100vh; display:flex; flex-direction:column; justify-content:center; align-items:center; padding:0 2rem; }
+.hero { text-align:center; max-width:860px; }
+.hero h1 { font-size:clamp(2.6rem,6.5vw,5.2rem); font-weight:700; line-height:1.05; letter-spacing:-.03em; margin-bottom:1.4rem; }
+.hw { display:inline-block; animation:wordReveal .8s cubic-bezier(.165,.84,.44,1) backwards; }
+.hw.t { color:var(--teal-l); text-shadow:0 0 30px var(--teal-glow); }
+.hero p { font-size:1.05rem; color:var(--txt-dim); margin:0 auto 2.5rem; max-width:78%; line-height:1.65; font-weight:300; }
+.btn-row { display:flex; justify-content:center; gap:1.2rem; flex-wrap:wrap; }
+
+/* ── Buttons ─────────────────────────────────────────────── */
+.btn { padding:.8rem 1.8rem; border-radius:8px; font-family:var(--font); font-weight:600; cursor:pointer; transition:all .25s; font-size:.82rem; letter-spacing:1px; text-transform:uppercase; border:none; white-space:nowrap; }
+.btn-teal  { background:rgba(90,173,157,.10); border:1px solid var(--teal-l);   color:var(--teal-l); }
+.btn-teal:hover:not(:disabled)  { background:rgba(90,173,157,.22); box-shadow:0 0 18px var(--teal-glow);   transform:translateY(-2px); }
+.btn-ghost { background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.10); color:var(--txt); }
+.btn-ghost:hover { background:rgba(255,255,255,.07); border-color:rgba(255,255,255,.18); transform:translateY(-2px); }
+.btn-rust  { background:rgba(201,58,0,.10);  border:1px solid var(--rust-l);   color:var(--rust-l); }
+.btn-rust:hover:not(:disabled)  { background:rgba(201,58,0,.22);   box-shadow:0 0 18px var(--rust-glow);   transform:translateY(-2px); }
+.btn-gold  { background:rgba(212,168,50,.10); border:1px solid var(--gold-l);   color:var(--gold-l); }
+.btn-gold:hover:not(:disabled)  { background:rgba(212,168,50,.22); box-shadow:0 0 18px var(--gold-glow);   transform:translateY(-2px); }
+.btn-purple{ background:rgba(176,125,212,.10);border:1px solid var(--purple-l); color:var(--purple-l); }
+.btn-purple:hover:not(:disabled){ background:rgba(176,125,212,.22);box-shadow:0 0 18px var(--purple-glow); transform:translateY(-2px); }
+.btn:disabled { opacity:.4; cursor:not-allowed; transform:none !important; box-shadow:none !important; }
+.btn-full { width:100%; display:block; }
+
+/* ── Cards ───────────────────────────────────────────────── */
+.card {
+  background:var(--bg-card); backdrop-filter:blur(16px);
+  border:1px solid var(--border); border-radius:var(--r);
+  box-shadow:0 12px 30px rgba(0,0,0,.22);
+}
+.card-pad { padding:2rem 2.2rem; }
+.section-tag { font-family:var(--mono); font-size:.72rem; color:var(--txt-dim); text-transform:uppercase; letter-spacing:2px; margin-bottom:.6rem; }
+h2.sec { font-size:1.35rem; font-weight:600; letter-spacing:.5px; margin-bottom:1.5rem; }
+
+/* ── ①  Connect section ──────────────────────────────────── */
+.connect-grid { display:grid; grid-template-columns:1fr 1fr; gap:2rem; }
+
+/* Model selector card */
+.model-select-area { display:flex; flex-direction:column; gap:1rem; }
+.row-flex { display:flex; gap:.6rem; align-items:flex-end; }
+.row-flex select, .row-flex input { flex:1; }
+
+input[type=text], input[type=number], select {
+  width:100%; background:rgba(0,0,0,.55); border:1px solid rgba(255,255,255,.10);
+  color:var(--txt); padding:.72rem .9rem; border-radius:6px; outline:none;
+  transition:border .25s; font-family:var(--mono); font-size:.9rem;
+}
+input:focus, select:focus { border-color:var(--teal-l); }
+select option { background:#090e0b; }
+label.form-lbl { display:block; font-size:.75rem; color:var(--txt-dim); margin-bottom:.45rem; text-transform:uppercase; letter-spacing:1px; }
+
+/* Live connection widget */
+.live-connection-card {
+  background:linear-gradient(135deg,rgba(5,20,15,0.95),rgba(10,25,18,0.90));
+  border-radius:var(--r); padding:1.8rem;
+  border:1px solid rgba(60,127,114,0.15);
+  display:flex; flex-direction:column; gap:1.2rem;
+}
+.conn-status-row { display:flex; align-items:center; gap:12px; }
+.conn-orb {
+  width:48px; height:48px; border-radius:50%;
+  background:rgba(255,255,255,.05); border:2px solid rgba(255,255,255,.08);
+  display:flex; align-items:center; justify-content:center;
+  transition:all .6s;
+  flex-shrink:0;
+}
+.conn-orb.connected { background:rgba(46,204,113,.12); border-color:rgba(46,204,113,.4); box-shadow:0 0 20px rgba(46,204,113,.25); }
+.conn-orb.connecting { background:rgba(212,168,50,.10); border-color:rgba(212,168,50,.35); }
+.conn-orb-inner { width:16px; height:16px; border-radius:50%; background:var(--txt-dim); transition:all .4s; }
+.conn-orb.connected  .conn-orb-inner { background:var(--green-l); box-shadow:0 0 10px var(--green-l); animation:livePing 1.4s ease-out infinite; }
+.conn-orb.connecting .conn-orb-inner { background:var(--gold-l); animation:spin .8s linear infinite; border-radius:50% 50% 50% 0; }
+.conn-info { flex:1; }
+.conn-model-name { font-size:1rem; font-weight:700; color:var(--txt); margin-bottom:4px; }
+.conn-model-sub { font-family:var(--mono); font-size:.75rem; color:var(--txt-dim); }
+
+.conn-stats { display:grid; grid-template-columns:1fr 1fr; gap:.8rem; }
+.conn-stat { background:rgba(0,0,0,.3); border-radius:8px; padding:.85rem 1rem; }
+.conn-stat .cs-lbl { font-size:.65rem; text-transform:uppercase; letter-spacing:1.5px; color:var(--txt-dim); margin-bottom:5px; }
+.conn-stat .cs-val { font-family:var(--mono); font-size:1.3rem; font-weight:700; }
+
+/* Info banner */
+.banner { padding:.75rem 1rem; border-radius:8px; font-size:.8rem; line-height:1.5; font-family:var(--mono); }
+.banner.warn   { background:rgba(212,168,50,.08);  border:1px solid rgba(212,168,50,.2);  color:var(--gold-l); }
+.banner.ok     { background:rgba(90,173,157,.08);  border:1px solid rgba(90,173,157,.2);  color:var(--teal-l); }
+.banner.err    { background:rgba(201,58,0,.08);    border:1px solid rgba(201,58,0,.22);   color:var(--rust-l); }
+.banner.info   { background:rgba(176,125,212,.08); border:1px solid rgba(176,125,212,.2); color:var(--purple-l); }
+
+/* ── ② Benchmark baseline row ────────────────────────────── */
+.baseline-strip { display:grid; grid-template-columns:repeat(5,1fr); gap:1rem; }
+.bstat { background:rgba(0,0,0,.35); border:1px solid rgba(255,255,255,.05); border-radius:10px; padding:1.2rem 1rem; }
+.bstat .bs-lbl { font-size:.65rem; text-transform:uppercase; letter-spacing:1.5px; color:var(--txt-dim); margin-bottom:8px; }
+.bstat .bs-val { font-family:var(--mono); font-size:1.6rem; font-weight:700; line-height:1; }
+.bstat .bs-unit { font-size:.72rem; color:var(--txt-dim); margin-top:4px; }
+
+/* ── ③ BEFORE vs AFTER comparison panel ─────────────────── */
+.bva-panel {
+  background:var(--bg-card); backdrop-filter:blur(16px);
+  border:1px solid var(--border); border-radius:var(--r);
+  overflow:hidden;
+}
+.bva-header {
+  display:grid; grid-template-columns:1fr 80px 1fr;
+  background:rgba(0,0,0,.3);
+  border-bottom:1px solid rgba(255,255,255,.06);
+}
+.bva-col-head {
+  padding:1rem 1.5rem;
+  font-size:.72rem; text-transform:uppercase; letter-spacing:2px; font-weight:700;
+}
+.bva-col-head.before { color:var(--rust-l); background:rgba(201,58,0,.06); border-right:1px solid rgba(255,255,255,.06); }
+.bva-col-head.vs     { text-align:center; color:var(--txt-dim); background:rgba(0,0,0,.2); border-right:1px solid rgba(255,255,255,.06); display:flex; align-items:center; justify-content:center; }
+.bva-col-head.after  { color:var(--teal-l); background:rgba(90,173,157,.06); }
+
+.bva-body { display:grid; grid-template-columns:1fr 80px 1fr; }
+.bva-col { padding:1.5rem; display:flex; flex-direction:column; gap:1.2rem; }
+.bva-col.right { border-left:1px solid rgba(255,255,255,.06); }
+.bva-mid { display:flex; flex-direction:column; justify-content:center; align-items:center; gap:.8rem; background:rgba(0,0,0,.15); border-left:1px solid rgba(255,255,255,.04); border-right:1px solid rgba(255,255,255,.04); padding:.8rem .4rem; }
+
+/* Metric row inside BvA panel */
+.mr { display:flex; flex-direction:column; gap:6px; }
+.mr .mr-label { font-size:.68rem; text-transform:uppercase; letter-spacing:1.5px; color:var(--txt-dim); }
+.mr .mr-val   { font-family:var(--mono); font-size:1.5rem; font-weight:700; }
+.mr .mr-bar-track { background:rgba(255,255,255,.06); border-radius:4px; height:7px; overflow:hidden; }
+.mr .mr-bar-fill  { height:100%; border-radius:4px; transition:width .55s ease; }
+
+/* Delta pill in the middle column */
+.delta-pill {
+  display:flex; align-items:center; justify-content:center;
+  width:64px; height:64px; border-radius:50%;
+  font-family:var(--mono); font-size:.82rem; font-weight:700;
+  text-align:center; line-height:1.2;
+  transition:all .4s;
+}
+.delta-pill.saved { background:rgba(46,204,113,.15); border:1.5px solid rgba(46,204,113,.35); color:var(--green-l); }
+.delta-pill.worse { background:rgba(201,58,0,.12);  border:1.5px solid rgba(201,58,0,.30);   color:var(--rust-l); }
+.delta-pill.none  { background:rgba(255,255,255,.05); border:1.5px solid rgba(255,255,255,.10);color:var(--txt-dim); }
+
+/* Saving headline */
+.saving-headline {
+  text-align:center; padding:1.2rem;
+  border-top:1px solid rgba(255,255,255,.05);
+  display:flex; align-items:center; justify-content:center; gap:1.5rem;
+}
+.saving-big { font-family:var(--mono); font-size:2.8rem; font-weight:700; line-height:1; }
+.saving-sub { font-size:.75rem; color:var(--txt-dim); text-transform:uppercase; letter-spacing:1.5px; margin-top:4px; }
+
+/* ── ④ Opt technique cards ───────────────────────────────── */
+.opt-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(270px,1fr)); gap:1.3rem; }
+.opt-card {
+  background:linear-gradient(150deg,rgba(18,28,22,.9),rgba(8,13,10,.95));
+  border:1px solid rgba(255,255,255,.06);
+  border-radius:var(--r); padding:1.6rem;
+  display:flex; flex-direction:column; gap:.9rem;
+  transition:all .3s cubic-bezier(.165,.84,.44,1); position:relative;
+}
+.opt-card:hover { transform:translateY(-4px); border-color:rgba(255,255,255,.12); }
+.opt-card.applied { animation:optPulse .6s ease; }
+@keyframes optPulse { 0%{transform:scale(1.02);} 100%{transform:scale(1);} }
+.opt-icon { width:40px; height:40px; border-radius:8px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.opt-row { display:flex; align-items:center; gap:10px; }
+.opt-title { font-size:1rem; font-weight:700; }
+.opt-sub { font-size:.7rem; color:var(--txt-dim); }
+.opt-desc { font-size:.78rem; color:var(--txt-dim); line-height:1.5; }
+.opt-ctrl label.form-lbl { font-size:.68rem; }
+.opt-result-box {
+  background:rgba(0,0,0,.25); border-radius:6px; padding:.7rem .9rem;
+  font-family:var(--mono); font-size:.78rem; color:var(--txt-dim);
+  min-height:44px; display:flex; align-items:center;
+}
+.opt-result-box.has-data { color:var(--teal-l); font-weight:600; }
+.opt-result-box.cmd { color:var(--gold-l); word-break:break-all; }
+
+/* ── ⑤ Stress test bar ───────────────────────────────────── */
+.stress-bar {
+  display:flex; align-items:center; gap:1rem; flex-wrap:wrap;
+  background:rgba(0,0,0,.3); border:1px solid rgba(255,255,255,.06);
+  border-radius:var(--r); padding:1.2rem 1.6rem;
+}
+.stress-info { flex:1; min-width:140px; font-size:.8rem; color:var(--txt-dim); line-height:1.5; }
+.stress-info strong { color:var(--txt); }
+.stress-status-txt { font-family:var(--mono); font-size:.8rem; color:var(--txt-dim); }
+
+/* ── ⑥ Live sidebar ──────────────────────────────────────── */
+.dash-layout { display:grid; grid-template-columns:1fr 300px; gap:2rem; align-items:start; }
+.live-panel {
+  background:var(--bg-card); backdrop-filter:blur(16px);
+  border:1px solid var(--border); border-radius:var(--r);
+  padding:1.6rem; position:sticky; top:72px;
+}
+.live-panel h3 { font-size:.82rem; text-transform:uppercase; letter-spacing:2px; color:var(--teal-l); border-bottom:1px solid rgba(255,255,255,.07); padding-bottom:.7rem; margin-bottom:1.2rem; }
+
+.hw-row { margin-bottom:.9rem; }
+.hw-row-lbl { display:flex; justify-content:space-between; font-size:.68rem; color:var(--txt-dim); margin-bottom:4px; }
+.hw-row-lbl span:last-child { color:var(--txt); font-weight:700; font-family:var(--mono); }
+.bar-track { background:rgba(255,255,255,.06); border-radius:4px; height:6px; overflow:hidden; }
+.bar-fill { height:100%; border-radius:4px; transition:width .4s ease; }
+.cl { background:var(--teal-l); }
+.gp { background:var(--purple-l); }
+.gw { background:var(--gold-l); }
+.tw { background:var(--teal-l); }
+.rr { background:var(--rust-l); }
+
+.live-divider { height:1px; background:rgba(255,255,255,.06); margin:1rem 0; }
+
+.carbon-row { display:flex; align-items:center; justify-content:space-between; }
+.carbon-val { font-family:var(--mono); font-size:1.1rem; font-weight:700; color:var(--gold-l); }
+
+/* Phase badge */
+.pbadge { font-size:.62rem; font-weight:800; letter-spacing:1.5px; text-transform:uppercase; padding:3px 8px; border-radius:20px; transition:all .4s; }
+.p-idle     { background:rgba(255,255,255,.07); color:var(--txt-dim); }
+.p-testing  { background:rgba(201,58,0,.18);    color:var(--rust-l); box-shadow:0 0 10px rgba(201,58,0,.3); }
+.p-opted    { background:rgba(90,173,157,.18);   color:var(--teal-l); box-shadow:0 0 10px rgba(90,173,157,.3); }
+.p-running  { background:rgba(46,204,113,.18); color:var(--green-l); box-shadow:0 0 10px rgba(46,204,113,.4); }
+
+/* ── Analytics charts ────────────────────────────────────── */
+.charts-grid { display:grid; grid-template-columns:1fr 1fr; gap:1.5rem; }
+.chart-card { padding:1.5rem 1.5rem 1rem; }
+.chart-card h4 { font-size:.82rem; font-weight:600; margin-bottom:1rem; color:var(--txt-dim); text-transform:uppercase; letter-spacing:1.5px; }
+
+/* ── Table ───────────────────────────────────────────────── */
+.stbl { width:100%; border-collapse:separate; border-spacing:0; }
+.stbl th { text-align:left; font-size:.7rem; text-transform:uppercase; letter-spacing:1px; color:var(--txt-dim); padding:.8rem 1.1rem; border-bottom:1px solid rgba(255,255,255,.08); }
+.stbl td { padding:.9rem 1.1rem; border-bottom:1px solid rgba(255,255,255,.03); font-family:var(--mono); font-size:.83rem; vertical-align:middle; }
+.stbl tbody tr:hover { background:rgba(255,255,255,.025); }
+.stbl .tl { border-left:3px solid var(--teal-l); }
+.stbl .gl { border-left:3px solid var(--gold-l); }
+.stbl .pl { border-left:3px solid var(--purple-l); }
+.stbl .rl { border-left:3px solid var(--rust-l); }
+
+/* ── Toast ───────────────────────────────────────────────── */
+#toast {
+  position:fixed; top:76px; left:50%;
+  transform:translateX(-50%) translateY(-20px);
+  font-weight:700; font-size:.82rem; padding:9px 26px; border-radius:8px;
+  z-index:600; pointer-events:none; opacity:0;
+  transition:all .4s cubic-bezier(.165,.84,.44,1);
+  letter-spacing:1px; text-transform:uppercase; white-space:nowrap;
+  box-shadow:0 10px 25px rgba(0,0,0,.4);
+}
+.spinner { display:inline-block; width:13px; height:13px; border:2px solid rgba(255,255,255,.2); border-top-color:var(--teal-l); border-radius:50%; animation:spin .8s linear infinite; vertical-align:middle; margin-right:5px; }
+
+/* ── Animations ──────────────────────────────────────────── */
+@keyframes fadeIn    { to{opacity:1} }
+@keyframes slideDown { from{transform:translateY(-20px);opacity:0} to{transform:translateY(0);opacity:1} }
+@keyframes wordReveal{ from{opacity:0;transform:translateY(18px);filter:blur(4px)} to{opacity:1;transform:translateY(0);filter:blur(0)} }
+@keyframes pulse     { 0%,100%{opacity:1;box-shadow:0 0 8px currentColor} 50%{opacity:.4;box-shadow:none} }
+@keyframes spin      { to{transform:rotate(360deg)} }
+
+/* ── Footer ──────────────────────────────────────────────── */
+footer { text-align:center; padding:2.5rem 2rem; border-top:1px solid rgba(255,255,255,.05); color:var(--txt-dim); font-size:.85rem; line-height:1.8; }
+
+/* ── Responsive ──────────────────────────────────────────── */
+@media(max-width:1100px){ .dash-layout{grid-template-columns:1fr;} .live-panel{position:static;} }
+@media(max-width:900px) { .connect-grid{grid-template-columns:1fr;} .bva-panel .bva-body{grid-template-columns:1fr;} .bva-panel .bva-header{grid-template-columns:1fr;} .bva-mid,.bva-col-head.vs{display:none;} .charts-grid{grid-template-columns:1fr;} }
+@media(max-width:720px) { .baseline-strip{grid-template-columns:1fr 1fr;} .saving-big{font-size:2rem;} .header-right{display:none;} }
+</style>
+</head>
+<body>
+<div class="scanlines"></div>
+<canvas id="three-bg"></canvas>
+<div id="toast">OK</div>
+
+<div class="ui-wrap">
+
+<header>
+  <div class="logo">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+      <path d="M12 2C6 2 3 8 3 14c0 4 2.5 7 5 8 0-4 1-7 4-9-1 3-1 6 0 9 2.5-1 5-4 5-8 0-6-3-12-5-12z" stroke="#5aad9d" stroke-width="1.8" stroke-linecap="round"/>
+    </svg>
+    ZEROTRACE AI
+  </div>
+  <div class="header-center">
+    <div id="api-status"><div class="blink-dot"></div><span id="status-text">CONNECTING…</span></div>
+    <div id="model-pill"><div class="live-ring"></div><span id="pill-model-name">MODEL</span></div>
+    
+    <div id="global-radar">
+      <div id="radar-dot"></div><span id="radar-text">RADAR: IDLE</span>
+    </div>
+
+  </div>
+  <div class="header-right">
+    <span id="hdr-profile" style="color:var(--txt-dim);">No optimization</span>
+    <span id="live-clock">00:00:00</span>
+  </div>
+</header>
+
+<div class="hero-container" style="padding-top:64px;">
+  <div class="hero">
+    <h1>
+      <span class="hw t" style="animation-delay:500ms">Zero</span>
+      <span class="hw" style="animation-delay:600ms">Emissions.</span><br>
+      <span class="hw t" style="animation-delay:700ms">Zero</span>
+      <span class="hw" style="animation-delay:800ms">Compromise.</span>
+    </h1>
+    <p>Select one of your downloaded Ollama models, measure real CPU/GPU baseline, apply an optimization, and watch the live reduction in hardware load — all in one screen.</p>
+    <div class="btn-row">
+      <button class="btn btn-teal" onclick="scrollTo('connect-sec')">↓ CONNECT MODEL</button>
+      <button class="btn btn-ghost" onclick="scrollTo('compare-sec')">LIVE COMPARISON</button>
+    </div>
+  </div>
+</div>
+
+<main class="container">
+
+<section id="howto-sec">
+  <div class="section-tag">00 — STARTUP GUIDE</div>
+  <h2 class="sec">How to Run Everything</h2>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;">
+
+    <div class="card card-pad">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:1.2rem;">
+        <div style="width:32px;height:32px;border-radius:8px;background:rgba(212,168,50,.15);border:1px solid rgba(212,168,50,.3);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--gold-l)" stroke-width="2.5" stroke-linecap="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+        </div>
+        <div>
+          <div style="font-size:.85rem;font-weight:700;color:var(--gold-l);">TERMINAL 1 — Ollama Server</div>
+          <div style="font-size:.7rem;color:var(--txt-dim);">Keep this running the whole time</div>
+        </div>
+      </div>
+      <div style="background:#000;border-radius:8px;padding:1rem 1.2rem;font-family:var(--mono);font-size:.85rem;line-height:1.9;border:1px solid rgba(255,255,255,.06);">
+        <div style="color:var(--txt-dim);margin-bottom:.3rem;"># Start the Ollama model server</div>
+        <div><span style="color:var(--teal-l);">$</span> <span style="color:#fff;">ollama serve</span></div>
+        <div style="margin-top:.6rem;color:var(--txt-dim);font-size:.75rem;">↳ Leave this window open · runs on port 11434</div>
+      </div>
+      <div style="margin-top:1rem;display:flex;flex-direction:column;gap:.5rem;">
+        <div style="font-size:.72rem;color:var(--txt-dim);text-transform:uppercase;letter-spacing:1px;margin-bottom:.2rem;">Your downloaded models</div>
+        <div style="background:#000;border-radius:6px;padding:.7rem 1rem;font-family:var(--mono);font-size:.8rem;border:1px solid rgba(255,255,255,.05);">
+          <div><span style="color:var(--teal-l);">$</span> <span style="color:#fff;">ollama list</span></div>
+          <div style="margin-top:.4rem;color:var(--txt-dim);font-size:.72rem;">↳ Shows all models available to select below</div>
+        </div>
+      </div>
+      <div id="terminal1-status" style="margin-top:1rem;" class="banner warn">⏳ Checking Ollama connection…</div>
+    </div>
+
+    <div class="card card-pad">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:1.2rem;">
+        <div style="width:32px;height:32px;border-radius:8px;background:rgba(90,173,157,.15);border:1px solid rgba(90,173,157,.3);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--teal-l)" stroke-width="2.5" stroke-linecap="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+        </div>
+        <div>
+          <div style="font-size:.85rem;font-weight:700;color:var(--teal-l);">TERMINAL 2 — Python Backend</div>
+          <div style="font-size:.7rem;color:var(--txt-dim);">Run this in the project folder</div>
+        </div>
+      </div>
+      <div style="background:#000;border-radius:8px;padding:1rem 1.2rem;font-family:var(--mono);font-size:.85rem;line-height:1.9;border:1px solid rgba(255,255,255,.06);">
+        <div style="color:var(--txt-dim);margin-bottom:.3rem;"># Navigate to the project folder</div>
+        <div><span style="color:var(--teal-l);">$</span> <span style="color:#fff;">cd C:\Users\Admin\Downloads\zzz</span></div>
+        <div style="margin-top:.4rem;color:var(--txt-dim);"># Start the API server</div>
+        <div><span style="color:var(--teal-l);">$</span> <span style="color:#fff;">python server.py</span></div>
+        <div style="margin-top:.6rem;color:var(--txt-dim);font-size:.75rem;">↳ Opens on http://localhost:8000</div>
+      </div>
+      <div style="margin-top:1rem;">
+        <div style="background:#000;border-radius:6px;padding:.7rem 1rem;font-family:var(--mono);font-size:.8rem;border:1px solid rgba(255,255,255,.05);">
+          <div style="color:var(--txt-dim);margin-bottom:.3rem;"># If missing packages, install first:</div>
+          <div><span style="color:var(--teal-l);">$</span> <span style="color:#fff;">pip install fastapi uvicorn psutil requests</span></div>
+        </div>
+      </div>
+      <div id="terminal2-status" style="margin-top:1rem;" class="banner warn">⏳ Checking Python API…</div>
+    </div>
+
+  </div>
+
+  <div style="margin-top:1.5rem;background:rgba(0,0,0,.25);border:1px solid rgba(255,255,255,.06);border-radius:var(--r);padding:1.4rem 2rem;display:flex;align-items:center;gap:2rem;flex-wrap:wrap;">
+    <div style="display:flex;align-items:center;gap:.8rem;">
+      <div style="width:28px;height:28px;border-radius:50%;background:rgba(212,168,50,.15);border:1px solid rgba(212,168,50,.4);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.75rem;color:var(--gold-l);flex-shrink:0;">1</div>
+      <span style="font-size:.82rem;">Start <code style="color:var(--gold-l);">ollama serve</code></span>
+    </div>
+    <div style="color:var(--txt-dim);">→</div>
+    <div style="display:flex;align-items:center;gap:.8rem;">
+      <div style="width:28px;height:28px;border-radius:50%;background:rgba(90,173,157,.15);border:1px solid rgba(90,173,157,.4);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.75rem;color:var(--teal-l);flex-shrink:0;">2</div>
+      <span style="font-size:.82rem;">Run <code style="color:var(--teal-l);">python server.py</code></span>
+    </div>
+    <div style="color:var(--txt-dim);">→</div>
+    <div style="display:flex;align-items:center;gap:.8rem;">
+      <div style="width:28px;height:28px;border-radius:50%;background:rgba(176,125,212,.15);border:1px solid rgba(176,125,212,.4);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.75rem;color:var(--purple-l);flex-shrink:0;">3</div>
+      <span style="font-size:.82rem;">Pick a model below &amp; click <strong>Connect</strong></span>
+    </div>
+    <div style="color:var(--txt-dim);">→</div>
+    <div style="display:flex;align-items:center;gap:.8rem;">
+      <div style="width:28px;height:28px;border-radius:50%;background:rgba(46,204,113,.15);border:1px solid rgba(46,204,113,.4);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.75rem;color:var(--green-l);flex-shrink:0;">4</div>
+      <span style="font-size:.82rem;">Click <strong>⚡ Measure Baseline</strong> then apply optimizations</span>
+    </div>
+  </div>
+</section>
+
+<section id="connect-sec">
+  <div class="section-tag">01 — MODEL CONNECTION</div>
+  <h2 class="sec">Connect an Ollama Model</h2>
+
+  <div class="card card-pad" style="margin-bottom:1.5rem;">
+    <div class="connect-grid">
+
+      <div class="model-select-area">
+        <div>
+          <label class="form-lbl">Ollama Model (locally downloaded)</label>
+          <div class="row-flex">
+            <select id="sel-model">
+              <option value="">— Loading… —</option>
+            </select>
+            <button class="btn btn-ghost" onclick="loadModels()" style="padding:.72rem 1rem;font-size:.8rem;" title="Refresh model list">↻</button>
+          </div>
+        </div>
+        <div id="offline-warn" class="banner warn" style="display:none;">⚠ Ollama not found on port 11434. Run: <strong>ollama serve</strong></div>
+
+        <button id="btn-connect" class="btn btn-teal btn-full" onclick="connectModel()" disabled>
+          ▶ CONNECT &amp; ACTIVATE
+        </button>
+        <div id="connect-result" class="banner ok" style="display:none;"></div>
+
+        <div style="margin-top:.8rem;padding-top:.8rem;border-top:1px solid rgba(255,255,255,.07);">
+          <label class="form-lbl">Or upload local model file <span style="color:var(--txt-dim);text-transform:none;letter-spacing:0;">.pt &nbsp;.pth &nbsp;.bin &nbsp;.safetensors</span></label>
+          <input type="file" id="file-input" accept=".pt,.pth,.bin,.safetensors,.zip"
+            onchange="uploadLocal(this)"
+            style="width:100%;padding:.6rem;font-size:.8rem;background:rgba(0,0,0,.5);border:1px dashed rgba(255,255,255,.12);border-radius:6px;color:var(--txt);cursor:pointer;">
+          <div id="file-result" class="banner ok" style="display:none;margin-top:.5rem;"></div>
+        </div>
+      </div>
+
+      <div class="live-connection-card" id="conn-card">
+        <div class="conn-status-row">
+          <div class="conn-orb" id="conn-orb"><div class="conn-orb-inner"></div></div>
+          <div class="conn-info">
+            <div class="conn-model-name" id="conn-model-name">No model selected</div>
+            <div class="conn-model-sub" id="conn-model-sub">Choose a model from the dropdown</div>
+          </div>
+        </div>
+        <div class="conn-stats">
+          <div class="conn-stat">
+            <div class="cs-lbl">Size</div>
+            <div class="cs-val txt-teal" id="cs-size" style="font-size:1rem;">—</div>
+          </div>
+          <div class="conn-stat">
+            <div class="cs-lbl">Quant</div>
+            <div class="cs-val txt-gold" id="cs-quant" style="font-size:1rem;">—</div>
+          </div>
+          <div class="conn-stat">
+            <div class="cs-lbl">Family</div>
+            <div class="cs-val" id="cs-family" style="font-size:1rem;">—</div>
+          </div>
+          <div class="conn-stat">
+            <div class="cs-lbl">Params</div>
+            <div class="cs-val txt-purple" id="cs-params" style="font-size:1rem;">—</div>
+          </div>
+        </div>
+        <button id="btn-bench" class="btn btn-gold btn-full" onclick="runBenchmark()" disabled>
+          ⚡ MEASURE REAL BASELINE (3 runs)
+        </button>
+        <div id="bench-banner" class="banner warn" style="display:none;"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="baseline-strip" id="baseline-strip">
+    <div class="bstat card">
+      <div class="bs-lbl">Avg Power</div>
+      <div class="bs-val txt-rust" id="bs-power">—</div>
+      <div class="bs-unit">watts (CPU+GPU, real NVML)</div>
+    </div>
+    <div class="bstat card">
+      <div class="bs-lbl">Tokens/sec</div>
+      <div class="bs-val txt-teal" id="bs-tps">—</div>
+      <div class="bs-unit">from Ollama eval_duration</div>
+    </div>
+    <div class="bstat card">
+      <div class="bs-lbl">Latency</div>
+      <div class="bs-val txt-gold" id="bs-lat">—</div>
+      <div class="bs-unit">ms per call (wall clock)</div>
+    </div>
+    <div class="bstat card">
+      <div class="bs-lbl">Energy / Call</div>
+      <div class="bs-val txt-purple" id="bs-energy">—</div>
+      <div class="bs-unit">joules (power × time)</div>
+    </div>
+    <div class="bstat card">
+      <div class="bs-lbl">CO₂ / Call</div>
+      <div class="bs-val" style="color:var(--green-l)" id="bs-co2">—</div>
+      <div class="bs-unit">grams (live UK grid)</div>
+    </div>
+  </div>
+</section>
+
+<section id="compare-sec">
+  <div class="section-tag">02 — LIVE COMPARISON</div>
+  <h2 class="sec">Before vs After Optimization</h2>
+
+  <div id="compare-warn" class="banner warn" style="margin-bottom:1.2rem;">
+    ⚠ Run the baseline benchmark first to unlock this comparison.
+  </div>
+
+  <div class="bva-panel card">
+    <div class="bva-header">
+      <div class="bva-col-head before">
+        <span>⬛ BEFORE OPTIMIZATION</span>
+        <div style="font-size:.65rem;opacity:.7;margin-top:3px;font-family:var(--mono);">Frozen from benchmark</div>
+      </div>
+      <div class="bva-col-head vs">VS</div>
+      <div class="bva-col-head after">
+        <span>◆ AFTER OPTIMIZATION</span>
+        <div style="font-size:.65rem;opacity:.7;margin-top:3px;font-family:var(--mono);">Live · updates every 1s</div>
+      </div>
+    </div>
+
+    <div class="bva-body">
+
+      <div class="bva-col">
+        <div class="mr">
+          <div class="mr-label">CPU Usage</div>
+          <div class="mr-val txt-rust" id="bva-before-cpu">—</div>
+          <div class="mr-bar-track"><div class="mr-bar-fill rr" id="bva-bar-before-cpu" style="width:0%"></div></div>
+        </div>
+        <div class="mr">
+          <div class="mr-label">GPU Utilisation</div>
+          <div class="mr-val txt-rust" id="bva-before-gpu">—</div>
+          <div class="mr-bar-track"><div class="mr-bar-fill rr" id="bva-bar-before-gpu" style="width:0%"></div></div>
+        </div>
+        <div class="mr">
+          <div class="mr-label">GPU Power</div>
+          <div class="mr-val txt-rust" id="bva-before-gpupwr">—</div>
+          <div class="mr-bar-track"><div class="mr-bar-fill rr" id="bva-bar-before-gpupwr" style="width:0%"></div></div>
+        </div>
+        <div class="mr">
+          <div class="mr-label">Total System Power</div>
+          <div class="mr-val txt-rust" id="bva-before-pwr">—</div>
+          <div class="mr-bar-track"><div class="mr-bar-fill rr" id="bva-bar-before-pwr" style="width:0%"></div></div>
+        </div>
+      </div>
+
+      <div class="bva-mid">
+        <div class="delta-pill none" id="dp-cpu"><span>CPU</span></div>
+        <div class="delta-pill none" id="dp-gpu"><span>GPU</span></div>
+        <div class="delta-pill none" id="dp-pwr"><span>PWR</span></div>
+      </div>
+
+      <div class="bva-col right">
+        <div class="mr">
+          <div class="mr-label">CPU Usage <span class="pbadge p-idle" id="phase-badge" style="margin-left:8px;">● IDLE</span></div>
+          <div class="mr-val txt-teal" id="bva-after-cpu">—</div>
+          <div class="mr-bar-track"><div class="mr-bar-fill cl" id="bva-bar-after-cpu" style="width:0%"></div></div>
+        </div>
+        <div class="mr">
+          <div class="mr-label">GPU Utilisation</div>
+          <div class="mr-val txt-teal" id="bva-after-gpu">—</div>
+          <div class="mr-bar-track"><div class="mr-bar-fill gp" id="bva-bar-after-gpu" style="width:0%"></div></div>
+        </div>
+        <div class="mr">
+          <div class="mr-label">GPU Power (NVML)</div>
+          <div class="mr-val txt-teal" id="bva-after-gpupwr">—</div>
+          <div class="mr-bar-track"><div class="mr-bar-fill gw" id="bva-bar-after-gpupwr" style="width:0%"></div></div>
+        </div>
+        <div class="mr">
+          <div class="mr-label">Total System Power</div>
+          <div class="mr-val txt-teal" id="bva-after-pwr">—</div>
+          <div class="mr-bar-track"><div class="mr-bar-fill tw" id="bva-bar-after-pwr" style="width:0%"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="saving-headline">
+      <div style="text-align:left;">
+        <div class="saving-big txt-teal" id="sav-big">—</div>
+        <div class="saving-sub" id="sav-sub">Run benchmark + apply optimization to see savings</div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1.2rem;">
+        <div style="text-align:center; padding:.8rem 1.2rem; background:rgba(0,0,0,.3);border-radius:8px;">
+          <div style="font-size:.62rem;color:var(--txt-dim);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:4px;">Power Saving</div>
+          <div style="font-family:var(--mono);font-size:1.1rem;font-weight:700;color:var(--teal-l);" id="sav-watts">— W</div>
+        </div>
+        <div style="text-align:center; padding:.8rem 1.2rem; background:rgba(0,0,0,.3);border-radius:8px;">
+          <div style="font-size:.62rem;color:var(--txt-dim);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:4px;">Active Profile</div>
+          <div style="font-family:var(--mono);font-size:.8rem;font-weight:700;color:var(--gold-l);" id="sav-profile">none</div>
+        </div>
+        <div style="text-align:center; padding:.8rem 1.2rem; background:rgba(0,0,0,.3);border-radius:8px;">
+          <div style="font-size:.62rem;color:var(--txt-dim);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:4px;">Baseline Power</div>
+          <div style="font-family:var(--mono);font-size:1.1rem;font-weight:700;color:var(--rust-l);" id="sav-baseline">— W</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="opt-sec">
+  <div class="section-tag">03 — ENERGY OPTIMIZATIONS</div>
+  <h2 class="sec">4 Real Techniques — Each Measured Before &amp; After</h2>
+  <div id="opt-locked" class="banner warn" style="margin-bottom:1.2rem;">
+    ⚠ Benchmark the model first to enable these controls.
+  </div>
+
+  <div class="opt-grid">
+
+    <div class="opt-card" id="oc-token">
+      <div class="opt-row">
+        <div class="opt-icon" style="background:rgba(90,173,157,.12);border:1px solid rgba(90,173,157,.25);">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--teal-l)" stroke-width="2.5" stroke-linecap="round"><path d="M4 7h16M4 12h10M4 17h6"/></svg>
+        </div>
+        <div><div class="opt-title txt-teal">Token Limit</div><div class="opt-sub">60–80% energy reduction</div></div>
+      </div>
+      <div class="opt-desc">Sets <code style="color:var(--teal-l)">num_predict</code> — stops generation at N tokens. Energy saved is proportional to tokens NOT generated.</div>
+      <div class="opt-ctrl">
+        <label class="form-lbl">Token limit <span id="lbl-tok">80</span></label>
+        <input type="range" min="20" max="300" value="80" id="sl-tok"
+          oninput="document.getElementById('lbl-tok').textContent=this.value"
+          style="width:100%;height:5px;background:rgba(255,255,255,.1);border-radius:3px;-webkit-appearance:none;outline:none;cursor:pointer;">
+      </div>
+      <button class="btn btn-teal btn-full" id="btn-tok" onclick="applyOpt('token_limit')" disabled>APPLY TOKEN LIMIT</button>
+      <div class="opt-result-box" id="res-token_limit">Awaiting benchmark…</div>
+    </div>
+
+    <div class="opt-card" id="oc-ctx">
+      <div class="opt-row">
+        <div class="opt-icon" style="background:rgba(212,168,50,.12);border:1px solid rgba(212,168,50,.25);">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--gold-l)" stroke-width="2.5" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M3 9h6M3 15h6"/></svg>
+        </div>
+        <div><div class="opt-title txt-gold">Context Reduction</div><div class="opt-sub">Attention is O(n²) — huge VRAM drop</div></div>
+      </div>
+      <div class="opt-desc">Shrinks <code style="color:var(--gold-l)">num_ctx</code> (KV cache). 4096→512 = 64× less attention compute. GPU memory visibly drops in NVML.</div>
+      <div class="opt-ctrl">
+        <label class="form-lbl">Context window <span id="lbl-ctx">512</span> tokens</label>
+        <input type="range" min="128" max="4096" step="128" value="512" id="sl-ctx"
+          oninput="document.getElementById('lbl-ctx').textContent=this.value"
+          style="width:100%;height:5px;background:rgba(255,255,255,.1);border-radius:3px;-webkit-appearance:none;outline:none;cursor:pointer;">
+      </div>
+      <button class="btn btn-gold btn-full" id="btn-ctx" onclick="applyOpt('context_reduction')" disabled>APPLY CONTEXT REDUCTION</button>
+      <div class="opt-result-box" id="res-context_reduction">Awaiting benchmark…</div>
+    </div>
+
+    <div class="opt-card" id="oc-gpu">
+      <div class="opt-row">
+        <div class="opt-icon" style="background:rgba(176,125,212,.12);border:1px solid rgba(176,125,212,.25);">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--purple-l)" stroke-width="2.5" stroke-linecap="round"><rect x="4" y="8" width="16" height="10" rx="2"/><path d="M8 8V6M12 8V6M16 8V6M7 18v2M17 18v2"/></svg>
+        </div>
+        <div><div class="opt-title txt-purple">GPU Routing</div><div class="opt-sub">Layer offload control</div></div>
+      </div>
+      <div class="opt-desc">Controls GPU vs CPU layer distribution. GPU-lean = fastest inference, least wall-time energy. CPU-lean = lower peak wattage.</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem;">
+        <button class="btn btn-purple btn-full" id="btn-gpulean" onclick="applyOpt('gpu_lean')" disabled style="font-size:.75rem;">GPU LEAN (num_gpu=99)</button>
+        <button class="btn btn-ghost btn-full"  id="btn-cpulean" onclick="applyOpt('cpu_lean')" disabled style="font-size:.75rem;">CPU LEAN (num_gpu=0)</button>
+      </div>
+      <div class="opt-result-box" id="res-gpu_routing">Awaiting benchmark…</div>
+    </div>
+
+    <div class="opt-card" id="oc-quant">
+      <div class="opt-row">
+        <div class="opt-icon" style="background:rgba(201,58,0,.12);border:1px solid rgba(201,58,0,.25);">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--rust-l)" stroke-width="2.5" stroke-linecap="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+        </div>
+        <div><div class="opt-title txt-rust">Quant Switch</div><div class="opt-sub">~50% less memory bandwidth</div></div>
+      </div>
+      <div class="opt-desc">Switch to a lower-bit GGUF variant (Q8→Q4). Must <code style="color:var(--rust-l)">ollama pull</code> the variant first. Biggest long-term saving.</div>
+      <div class="opt-ctrl">
+        <label class="form-lbl">Target variant</label>
+        <select id="sel-qv">
+          <option value="q2_K">Q2_K — 2-bit (lowest energy, lowest quality)</option>
+          <option value="q4_0" selected>Q4_0 — 4-bit (medium, ~50% energy)</option>
+          <option value="q4_K_M">Q4_K_M — 4-bit K (good quality)</option>
+          <option value="q5_K_M">Q5_K_M — 5-bit K (better quality)</option>
+          <option value="q8_0">Q8_0 — 8-bit (best quality)</option>
+        </select>
+      </div>
+      <button class="btn btn-rust btn-full" id="btn-quant" onclick="applyOpt('quant_switch')" disabled>GET PULL COMMAND</button>
+      <div class="opt-result-box cmd" id="res-quant_switch">Awaiting benchmark…</div>
+    </div>
+
+  </div>
+
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-top:1.2rem;gap:1rem;flex-wrap:wrap;">
+    <button class="btn btn-ghost" onclick="resetOpt()" style="font-size:.78rem;">↺ RESET ALL OPTIMIZATIONS</button>
+    <div style="font-size:.75rem;color:var(--txt-dim);font-family:var(--mono);">Each applied technique immediately fires a real inference call and reports measured before/after joules</div>
+  </div>
+</section>
+
+<section id="monitor-sec">
+  <div class="section-tag">04 — LIVE MONITOR</div>
+  <h2 class="sec">Real-Time Hardware Dashboard</h2>
+
+  <div class="stress-bar" style="margin-bottom:1.5rem;">
+    <div class="stress-info"><strong>Inference Stress Test</strong><br>Fires short prompts through the active model with all active optimizations applied.</div>
+    <button id="btn-stress-start" class="btn btn-teal" onclick="startStress()" disabled>▶ START</button>
+    <button id="btn-stress-stop" class="btn btn-rust" onclick="stopStress()" disabled style="display:none;">■ STOP</button>
+    <div class="stress-status-txt" id="stress-txt">IDLE</div>
+  </div>
+
+  <div class="dash-layout">
+
+    <div style="display:flex;flex-direction:column;gap:1.5rem;">
+
+      <div class="charts-grid">
+        <div class="card chart-card">
+          <h4>Total System Power (W)</h4>
+          <div style="position:relative;height:220px;"><canvas id="chart-power"></canvas></div>
+        </div>
+        <div class="card chart-card">
+          <h4>GPU Utilization %</h4>
+          <div style="position:relative;height:220px;"><canvas id="chart-gpu"></canvas></div>
+        </div>
+      </div>
+
+      <div class="card" style="overflow-x:auto;padding:1.5rem;">
+        <h3 style="font-size:1rem;margin-bottom:1.2rem;color:var(--txt);">Optimization Results — Real Measurements</h3>
+        <table class="stbl" id="opt-table">
+          <thead>
+            <tr>
+              <th>Strategy</th>
+              <th>Before Power (W)</th>
+              <th>After Power (W)</th>
+              <th>Before Energy (J)</th>
+              <th>After Energy (J)</th>
+              <th>Energy Saved %</th>
+              <th>Tok/s After</th>
+            </tr>
+          </thead>
+          <tbody id="opt-tbody">
+            <tr><td colspan="7" style="text-align:center;color:var(--txt-dim);padding:1.8rem;">Apply an optimization to populate this table with real measured data</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+
+    <div class="live-panel card">
+      <h3>⚡ Live Hardware</h3>
+
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:1rem;">
+        <span class="pbadge p-idle" id="live-phase">● IDLE</span>
+        <span style="font-size:.68rem;color:var(--txt-dim);" id="live-profile-lbl">No optimization active</span>
+      </div>
+
+      <div class="hw-row">
+        <div class="hw-row-lbl"><span>CPU Usage</span><span id="lv-cpu">0%</span></div>
+        <div class="bar-track"><div class="bar-fill rr" id="lv-cpu-bar" style="width:0%"></div></div>
+      </div>
+      <div class="hw-row">
+        <div class="hw-row-lbl"><span>RAM Usage</span><span id="lv-ram">0%</span></div>
+        <div class="bar-track"><div class="bar-fill cl" id="lv-ram-bar" style="width:0%"></div></div>
+      </div>
+      <div class="hw-row">
+        <div class="hw-row-lbl"><span>GPU Utilisation</span><span id="lv-gpu">0%</span></div>
+        <div class="bar-track"><div class="bar-fill gp" id="lv-gpu-bar" style="width:0%"></div></div>
+      </div>
+      <div class="hw-row">
+        <div class="hw-row-lbl"><span>GPU Power (NVML)</span><span id="lv-gpupwr">— W</span></div>
+        <div class="bar-track"><div class="bar-fill gw" id="lv-gpupwr-bar" style="width:0%"></div></div>
+      </div>
+      <div class="hw-row">
+        <div class="hw-row-lbl"><span>Total System Power</span><span id="lv-total">— W</span></div>
+        <div class="bar-track"><div class="bar-fill tw" id="lv-total-bar" style="width:0%"></div></div>
+      </div>
+
+      <div class="live-divider"></div>
+
+      <div style="text-align:center;margin-bottom:.8rem;">
+        <div style="font-size:.62rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--txt-dim);margin-bottom:6px;">Power Saving vs Baseline</div>
+        <div style="font-family:var(--mono);font-size:2.4rem;font-weight:700;color:var(--teal-l);line-height:1;" id="lv-saving-big">—</div>
+        <div style="font-size:.7rem;color:var(--txt-dim);margin-top:4px;" id="lv-saving-sub">Benchmark first</div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem;margin-bottom:1rem;">
+        <div style="background:rgba(0,0,0,.25);border-radius:8px;padding:.7rem;text-align:center;">
+          <div style="font-size:.6rem;color:var(--txt-dim);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;">Baseline W</div>
+          <div style="font-family:var(--mono);font-size:1rem;font-weight:700;color:var(--rust-l);" id="lv-baseline-w">—</div>
+        </div>
+        <div style="background:rgba(0,0,0,.25);border-radius:8px;padding:.7rem;text-align:center;">
+          <div style="font-size:.6rem;color:var(--txt-dim);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;">Current W</div>
+          <div style="font-family:var(--mono);font-size:1rem;font-weight:700;color:var(--teal-l);" id="lv-current-w">—</div>
+        </div>
+      </div>
+
+      <div class="live-divider"></div>
+
+      <div class="carbon-row">
+        <div>
+          <div style="font-size:.62rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--txt-dim);margin-bottom:3px;">Live Carbon Intensity</div>
+          <div class="carbon-val" id="lv-carbon">—</div>
+          <div style="font-size:.68rem;color:var(--txt-dim);">gCO₂/kWh (UK Grid API)</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+</main>
+
+<footer>
+  Zerotrace AI &middot; Real Ollama Integration &middot; Real NVML Hardware Telemetry &middot; Zero Hardcoded Values<br>
+  <span id="footer-model" style="color:var(--teal-l);">No model active</span> &middot; <span id="footer-profile">optimization: none</span>
+</footer>
+
+</div><script>
+const API = 'http://127.0.0.1:8000';
+
+// ── App state ──────────────────────────────────────────
+let activeModel   = null;
+let baselineData  = null;   // frozen snapshot from /api/benchmark
+let ollamaModels  = [];
+let activeProfile = 'none';
+let pwrHistory = [], gpuHistory = [];
+const MAX_H = 60;
+
+// Baseline snapshot (frozen values for BEFORE column)
+let bva_before = { cpu: null, gpu: null, gpupwr: null, pwr: null };
+
+// ── Clock ──────────────────────────────────────────────
+setInterval(() => {
+  document.getElementById('live-clock').textContent =
+    new Date().toLocaleTimeString('en-US',{hour12:false});
+}, 1000);
+
+// ── Scroll helper ──────────────────────────────────────
+function scrollTo(id) { document.getElementById(id).scrollIntoView({behavior:'smooth'}); }
+
+// ── Init ───────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', async () => {
+  initCharts();
+  init3D();
+  await checkHealth();
+  startSSE();
+});
+
+// ── Health ─────────────────────────────────────────────
+async function checkHealth() {
+  try {
+    const r = await fetch(`${API}/health`);
+    if (!r.ok) throw new Error();
+    const d = await r.json();
+    setStatus('ENGINE CONNECTED', true);
+    
+    // Update terminal 2 banner
+    const t2 = document.getElementById('terminal2-status');
+    if (t2) { t2.className = 'banner ok'; t2.innerHTML = '✓ Python API Connected (Port 8000)'; }
+
+    if (d.live_carbon) updateCarbon(d.live_carbon);
+    if (d.active_model) setActiveModelUI(d.active_model);
+    if (d.baseline_measured) {
+      baselineReady();
+      document.getElementById('compare-warn').style.display = 'none';
+    }
+    await loadModels();
+  } catch(e) {
+    setStatus('ENGINE OFFLINE', false);
+    const t2 = document.getElementById('terminal2-status');
+    if (t2) { t2.className = 'banner err'; t2.innerHTML = '✗ Python API Offline (Run: python server.py)'; }
+    toast('FastAPI offline. Run: python server.py', 'error');
+  }
+}
+
+function setStatus(txt, ok) {
+  const el = document.getElementById('api-status');
+  const tx = document.getElementById('status-text');
+  tx.textContent = txt;
+  el.style.color = ok ? 'var(--teal-l)' : 'var(--rust-l)';
+  el.style.background = ok ? 'rgba(90,173,157,0.08)' : 'rgba(201,58,0,0.08)';
+  el.style.borderColor = ok ? 'rgba(90,173,157,0.15)' : 'rgba(201,58,0,0.2)';
+}
+
+// ── Load Ollama models ─────────────────────────────────
+async function loadModels() {
+  try {
+    const r = await fetch(`${API}/api/ollama/models`);
+    const d = await r.json();
+    const sel = document.getElementById('sel-model');
+    sel.innerHTML = '';
+    const t1 = document.getElementById('terminal1-status');
+
+    if (!d.success || !d.models.length) {
+      sel.innerHTML = '<option value="">— No models found (ollama serve?) —</option>';
+      document.getElementById('offline-warn').style.display = 'block';
+      if (t1) { t1.className = 'banner err'; t1.innerHTML = '✗ No models found or Ollama is offline.'; }
+      return;
+    }
+    
+    document.getElementById('offline-warn').style.display = 'none';
+    ollamaModels = d.models;
+    if (t1) { t1.className = 'banner ok'; t1.innerHTML = `✓ Connected to Ollama (${ollamaModels.length} models found)`; }
+
+    d.models.forEach(m => {
+      const o = document.createElement('option');
+      o.value = m.name;
+      o.textContent = `${m.name}  ·  ${m.size_gb} GB  ·  ${m.quant}`;
+      sel.appendChild(o);
+    });
+    document.getElementById('btn-connect').disabled = false;
+    // pre-select first if none active
+    if (!activeModel) previewModel(d.models[0]);
+  } catch(e) { 
+    console.error('loadModels', e); 
+    const t1 = document.getElementById('terminal1-status');
+    if (t1) { t1.className = 'banner err'; t1.innerHTML = '✗ Failed to connect to Ollama.'; }
+  }
+}
+
+// preview model info in the connection card when dropdown changes
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('sel-model').addEventListener('change', function() {
+    const m = ollamaModels.find(x => x.name === this.value);
+    if (m) previewModel(m);
+  });
+});
+
+function previewModel(m) {
+  document.getElementById('conn-model-name').textContent = m.name;
+  document.getElementById('conn-model-sub').textContent  = `${m.size_gb} GB · ${m.family} · ${m.params}`;
+  document.getElementById('cs-size').textContent   = m.size_gb + ' GB';
+  document.getElementById('cs-quant').textContent  = m.quant;
+  document.getElementById('cs-family').textContent = m.family || '—';
+  document.getElementById('cs-params').textContent = m.params || '—';
+}
+
+// ── Connect model ──────────────────────────────────────
+async function connectModel() {
+  const model = document.getElementById('sel-model').value;
+  if (!model) return;
+
+  const orb = document.getElementById('conn-orb');
+  const btn = document.getElementById('btn-connect');
+  orb.className = 'conn-orb connecting';
+  btn.innerHTML = '<span class="spinner"></span> Connecting…';
+  btn.disabled = true;
+
+  try {
+    const r = await fetch(`${API}/api/ollama/set-active`,{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({model_name: model})
+    });
+    const d = await r.json();
+
+    if (r.ok && d.success) {
+      orb.className = 'conn-orb connected';
+      setActiveModelUI(model);
+      showBanner('connect-result','ok', `✓ ${model} connected. Click "Measure Real Baseline" to start.`);
+      document.getElementById('btn-bench').disabled = false;
+      toast('Model connected!');
+    } else {
+      throw new Error(d.detail || 'Connection failed');
+    }
+  } catch(e) {
+    orb.className = 'conn-orb';
+    showBanner('connect-result','err','✗ ' + e.message);
+    toast(e.message, 'error');
+  } finally {
+    btn.textContent = '▶ CONNECT & ACTIVATE';
+    btn.disabled = false;
+  }
+}
+
+function setActiveModelUI(model) {
+  activeModel = model;
+  // Header pill
+  document.getElementById('model-pill').classList.add('visible');
+  document.getElementById('pill-model-name').textContent = model;
+  // Header right
+  document.getElementById('active-model-display') && (document.getElementById('active-model-display').textContent = 'Active: '+model);
+  // Footer
+  document.getElementById('footer-model').textContent = model;
+  // Conn card
+  document.getElementById('conn-orb').className = 'conn-orb connected';
+  document.getElementById('conn-model-name').textContent = model;
+  // Fill model info if we have it
+  const m = ollamaModels.find(x => x.name === model);
+  if (m) previewModel(m);
+}
+
+// ── Benchmark ──────────────────────────────────────────
+async function runBenchmark() {
+  if (!activeModel) { toast('Connect a model first.','error'); return; }
+  const btn = document.getElementById('btn-bench');
+  btn.innerHTML = '<span class="spinner"></span> Benchmarking (3 real calls)…';
+  btn.disabled = true;
+  showBanner('bench-banner','warn','⏳ Running 3 real inference calls. This may take up to 60 s…');
+
+  try {
+    const r = await fetch(`${API}/api/benchmark`,{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({prompt:'What is 2+2?', n_runs:3})
+    });
+    if (!r.ok) { const e=await r.json(); throw new Error(e.detail); }
+    const d = await r.json();
+    const b = d.baseline;
+    baselineData = b;
+
+    // Fill baseline strip
+    document.getElementById('bs-power').textContent  = b.power_w.toFixed(1) + ' W';
+    document.getElementById('bs-tps').textContent    = b.tokens_per_sec.toFixed(1);
+    document.getElementById('bs-lat').textContent    = b.latency_ms.toFixed(0) + ' ms';
+    document.getElementById('bs-energy').textContent = b.energy_j.toFixed(3) + ' J';
+    document.getElementById('bs-co2').textContent    = (b.energy_j / 3600000 * getCarbon() * 1e6).toFixed(4) + ' µg';
+
+    // Lock BEFORE column in BvA panel using real baseline power reading
+    // We'll use total_power_w from the baseline, and store for comparison
+    bva_before.pwr = b.power_w;
+    // CPU/GPU are captured from next SSE tick where they exist, but
+    // we'll also grab a live snapshot right now
+    const snap = await fetch(`${API}/api/telemetry/live`).then(r=>r.json());
+    bva_before.cpu    = snap.cpu_pct;
+    bva_before.gpu    = snap.gpu_util;
+    bva_before.gpupwr = snap.gpu_power_w;
+    bva_before.pwr    = snap.total_power_w;
+    freezeBeforeColumn();
+
+    // Enable everything
+    baselineReady();
+    showBanner('bench-banner','ok', `✓ ${d.message}`);
+    document.getElementById('compare-warn').style.display = 'none';
+    document.getElementById('sav-baseline').textContent = b.power_w.toFixed(1) + ' W';
+    document.getElementById('lv-baseline-w').textContent = b.power_w.toFixed(1) + ' W';
+    toast('Baseline measured!');
+  } catch(e) {
+    showBanner('bench-banner','err','✗ ' + e.message);
+    toast('Benchmark failed: '+e.message,'error');
+  } finally {
+    btn.textContent = '⚡ MEASURE REAL BASELINE (3 runs)';
+    btn.disabled = false;
+  }
+}
+
+let _carbon = 214;
+function getCarbon() { return _carbon; }
+function updateCarbon(v) { _carbon=v; document.getElementById('lv-carbon').textContent = v.toFixed(1)+' gCO₂/kWh'; }
+
+function freezeBeforeColumn() {
+  const b = bva_before;
+  // CPU
+  setText('bva-before-cpu', b.cpu != null ? b.cpu.toFixed(1)+'%' : '—');
+  setBar('bva-bar-before-cpu', b.cpu || 0, 100);
+  // GPU
+  setText('bva-before-gpu', b.gpu != null ? b.gpu+'%' : '—');
+  setBar('bva-bar-before-gpu', b.gpu || 0, 100);
+  // GPU power
+  const maxPwr = 300;
+  setText('bva-before-gpupwr', b.gpupwr != null ? b.gpupwr.toFixed(1)+' W' : '— W');
+  setBar('bva-bar-before-gpupwr', b.gpupwr || 0, maxPwr);
+  // Total power
+  setText('bva-before-pwr', b.pwr != null ? b.pwr.toFixed(1)+' W' : '— W');
+  setBar('bva-bar-before-pwr', b.pwr || 0, maxPwr);
+}
+
+function baselineReady() {
+  // Enable opt buttons
+  ['btn-tok','btn-ctx','btn-gpulean','btn-cpulean','btn-quant'].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.disabled=false;
+  });
+  document.getElementById('opt-locked').style.display = 'none';
+  document.getElementById('btn-stress-start').disabled = false;
+}
+
+// ── Apply Optimization ─────────────────────────────────
+async function applyOpt(strategy) {
+  if (!baselineData) { toast('Run benchmark first.','error'); return; }
+
+  const payload = { strategy };
+  if (strategy==='token_limit')       payload.limit   = parseInt(document.getElementById('sl-tok').value);
+  if (strategy==='context_reduction') payload.ctx     = parseInt(document.getElementById('sl-ctx').value);
+  if (strategy==='quant_switch')      payload.variant = document.getElementById('sel-qv').value;
+
+  const rKey = (strategy==='gpu_lean'||strategy==='cpu_lean') ? 'gpu_routing' : strategy;
+  const resEl = document.getElementById(`res-${rKey}`);
+  if (resEl) { resEl.className='opt-result-box'; resEl.textContent='⏳ Measuring real effect…'; }
+
+  try {
+    const r = await fetch(`${API}/api/ollama/apply-optimization`,{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(payload)
+    });
+    const d = await r.json();
+    if (!d.success) throw new Error(d.detail||'Server error');
+
+    if (strategy==='quant_switch'){
+      if(resEl){ resEl.className='opt-result-box cmd'; resEl.textContent='$ '+d.pull_command+'\n'+d.instructions; }
+      toast('Pull command shown.'); return;
+    }
+
+    // Real measurement result
+    const sav = d.real_saving_pct;
+    if(resEl){
+      resEl.className='opt-result-box has-data';
+      resEl.textContent = `${sav>=0?'↓':'↑'} ${Math.abs(sav).toFixed(1)}% energy  ·  ${d.after.tok_per_sec?.toFixed(1)||'—'} tok/s  ·  ${d.after.energy_j?.toFixed(3)||'—'} J`;
+    }
+
+    // Add to table
+    addTableRow(strategy, d.before, d.after, sav);
+
+    // Update profile state
+    activeProfile = d.profile || strategy;
+    document.getElementById('sav-profile').textContent = activeProfile;
+    document.getElementById('hdr-profile').textContent = 'Profile: '+activeProfile;
+    document.getElementById('footer-profile').textContent = 'optimization: '+activeProfile;
+    document.getElementById('live-profile-lbl').textContent = 'Profile: '+activeProfile;
+
+    // Flash the card
+    const cardMap = {token_limit:'oc-token',context_reduction:'oc-ctx',gpu_lean:'oc-gpu',cpu_lean:'oc-gpu',quant_switch:'oc-quant'};
+    const card = document.getElementById(cardMap[strategy]);
+    if(card){ card.classList.add('applied'); setTimeout(()=>card.classList.remove('applied'),700); }
+
+    toast(`${sav.toFixed(1)}% real energy reduction measured!`);
+  } catch(e) {
+    if(resEl){ resEl.className='opt-result-box'; resEl.textContent='✗ '+e.message; }
+    toast('Error: '+e.message,'error');
+  }
+}
+
+function addTableRow(strategy, before, after, sav) {
+  const tbody = document.getElementById('opt-tbody');
+  if (tbody.querySelector('td[colspan]')) tbody.innerHTML='';
+  const cls = sav>=0?'tl':'rl';
+  const tr = document.createElement('tr');
+  tr.className = cls;
+  tr.innerHTML = `
+    <td style="font-weight:700">${strategy}</td>
+    <td>${before.power_w!=null?before.power_w.toFixed(1)+' W':'—'}</td>
+    <td>${after.power_w!=null?after.power_w.toFixed(1)+' W':'—'}</td>
+    <td>${before.energy_j!=null?before.energy_j.toFixed(3)+' J':'—'}</td>
+    <td>${after.energy_j!=null?after.energy_j.toFixed(3)+' J':'—'}</td>
+    <td style="color:${sav>=0?'var(--teal-l)':'var(--rust-l)'};font-weight:700">${sav>=0?'↓':'↑'} ${Math.abs(sav).toFixed(1)}%</td>
+    <td>${after.tok_per_sec!=null?after.tok_per_sec.toFixed(1):'—'}</td>
+  `;
+  tbody.prepend(tr);
+}
+
+// ── Reset ──────────────────────────────────────────────
+async function resetOpt() {
+  try {
+    await fetch(`${API}/api/ollama/reset-optimization`,{method:'POST'});
+    activeProfile='none';
+    ['res-token_limit','res-context_reduction','res-gpu_routing','res-quant_switch'].forEach(id=>{
+      const e=document.getElementById(id);
+      if(e){e.className='opt-result-box';e.textContent='Awaiting benchmark…';}
+    });
+    document.getElementById('sav-profile').textContent='none';
+    document.getElementById('hdr-profile').textContent='No optimization';
+    document.getElementById('footer-profile').textContent='optimization: none';
+    document.getElementById('live-profile-lbl').textContent='No optimization active';
+    // Reset deltas in BvA panel
+    ['dp-cpu','dp-gpu','dp-pwr'].forEach(id=>setDelta(id,null));
+    document.getElementById('sav-big').textContent='—';
+    document.getElementById('sav-sub').textContent='Apply an optimization to see savings';
+    document.getElementById('sav-watts').textContent='— W';
+    toast('Optimizations reset.');
+  } catch(e){ toast('Reset failed','error'); }
+}
+
+// ── Stress test ────────────────────────────────────────
+async function startStress() {
+  try {
+    const r = await fetch(`${API}/api/telemetry/toggle-load`,{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({enable:true})
+    });
+    const d = await r.json();
+    if (d.status==='started') {
+      document.getElementById('btn-stress-start').style.display='none';
+      document.getElementById('btn-stress-stop').style.display='inline-block';
+      document.getElementById('btn-stress-stop').disabled=false;
+      document.getElementById('stress-txt').textContent='● RUNNING';
+      toast('Stress test started.');
+    } else throw new Error(d.detail||'Could not start');
+  } catch(e){ toast('Start failed: '+e.message,'error'); }
+}
+
+async function stopStress() {
+  await fetch(`${API}/api/telemetry/toggle-load`,{
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({enable:false})
+  });
+  document.getElementById('btn-stress-start').style.display='inline-block';
+  document.getElementById('btn-stress-stop').style.display='none';
+  document.getElementById('stress-txt').textContent='IDLE';
+}
+
+// ── File upload ────────────────────────────────────────
+async function uploadLocal(inp) {
+  const file=inp.files[0]; if(!file) return;
+  showBanner('file-result','warn',`<span class="spinner"></span> Loading ${file.name}…`);
+  const fd=new FormData(); fd.append('model_file',file);
+  try {
+    const r=await fetch(`${API}/api/load-local-model`,{method:'POST',body:fd});
+    const d=await r.json();
+    if(d.success){ showBanner('file-result','ok',`✓ ${d.model_name} (${d.params_b}B)${d.note?' — '+d.note:''}`); setActiveModelUI(d.model_name); document.getElementById('btn-bench').disabled=false; toast('Local model loaded!'); }
+    else showBanner('file-result','err','✗ '+(d.error||'Failed'));
+  } catch(e){ showBanner('file-result','err','✗ '+e.message); }
+}
+
+async function loadHF() {
+  const id=document.getElementById('hf-id').value.trim(); if(!id) return;
+  showBanner('hf-result','warn',`<span class="spinner"></span> Downloading ${id}…`);
+  try {
+    const r=await fetch(`${API}/api/load-hf-model`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model_id:id})});
+    const d=await r.json();
+    if(d.success){ showBanner('hf-result','ok',`✓ ${d.model_name} (${d.params_b}B) in ${d.load_time_s}s`); setActiveModelUI(d.model_name); document.getElementById('btn-bench').disabled=false; toast('HF model loaded!'); }
+    else showBanner('hf-result','err','✗ '+(d.error||'Failed'));
+  } catch(e){ showBanner('hf-result','err','✗ '+e.message); }
+}
+
+// ── SSE — real-time telemetry ──────────────────────────
+function startSSE() {
+  function connect() {
+    const es = new EventSource(`${API}/api/metrics/stream`);
+    es.onmessage = e => {
+      const d = JSON.parse(e.data);
+      updateLiveSidebar(d);
+      updateAfterColumn(d);
+      pushCharts(d);
+      if (d.profile && d.profile!=='none') updateCarbon(d.carbon || _carbon);
+    };
+    es.onerror = () => { es.close(); setTimeout(connect,3000); };
+  }
+  connect();
+}
+
+function updateLiveSidebar(d) {
+  const maxPwr = 300;
+  setBarVal('lv-cpu-bar','lv-cpu', d.cpu_pct,100,'%');
+  setBarVal('lv-ram-bar','lv-ram', d.ram_pct,100,'%');
+  setBarVal('lv-gpu-bar','lv-gpu', d.gpu_util,100,'%');
+  d.gpu_power_w>0
+    ? setBarVal('lv-gpupwr-bar','lv-gpupwr',d.gpu_power_w,maxPwr,' W')
+    : setText('lv-gpupwr','— W');
+  setBarVal('lv-total-bar','lv-total',d.total_power_w,maxPwr,' W');
+  setText('lv-current-w', d.total_power_w.toFixed(1)+' W');
+
+  // Saving
+  if (d.saving_pct!=null) {
+    const sp=d.saving_pct;
+    setText('lv-saving-big',(sp>=0?'↓':'↑')+Math.abs(sp).toFixed(1)+'%');
+    document.getElementById('lv-saving-big').style.color = sp>=0?'var(--teal-l)':'var(--rust-l)';
+    setText('lv-saving-sub', sp>=0?'power saved vs baseline':'higher than baseline');
+    setText('sav-big',(sp>=0?'↓':'↑')+Math.abs(sp).toFixed(1)+'%');
+    document.getElementById('sav-big').style.color = sp>=0?'var(--teal-l)':'var(--rust-l)';
+    setText('sav-sub', sp>=0?'energy reduction vs baseline':'energy increase vs baseline');
+    if(d.saving_w!=null) setText('sav-watts',(d.saving_w>=0?'−':'+')+Math.abs(d.saving_w).toFixed(1)+' W');
+  }
+  if(d.baseline_w) setText('lv-baseline-w',d.baseline_w.toFixed(1)+' W');
+
+  // ── Global Radar & Phase Logic ───────────────────
+  const ph = document.getElementById('live-phase');
+  const pb = document.getElementById('phase-badge');
+  const radar = document.getElementById('global-radar');
+  const radarTxt = document.getElementById('radar-text');
+
+  if (d.model_status === 'running') {
+      // Light up the Radar!
+      radar.className = 'radar-running';
+      radarTxt.textContent = 'RADAR: INFERENCE ACTIVE';
+      
+      if (d.is_testing) {
+          ph.className='pbadge p-testing'; ph.textContent='● TESTING'; 
+          pb.className='pbadge p-testing'; pb.textContent='● LIVE'; 
+      } else {
+          // Model is running externally (CMD)
+          ph.className='pbadge p-running'; ph.textContent='● CMD RUNNING'; 
+          pb.className='pbadge p-running'; pb.textContent='● ACTIVE'; 
+      }
+  } else {
+      // Radar Idle
+      radar.className = '';
+      radarTxt.textContent = 'RADAR: IDLE';
+      
+      if (d.profile && d.profile !== 'none') { 
+          ph.className='pbadge p-opted'; ph.textContent='● OPTIMIZED'; 
+          pb.className='pbadge p-opted'; pb.textContent='● OPT'; 
+      } else { 
+          ph.className='pbadge p-idle'; ph.textContent='● IDLE'; 
+          pb.className='pbadge p-idle'; pb.textContent='● IDLE'; 
+      }
+  }
+}
+
+function updateAfterColumn(d) {
+  const maxPwr=300;
+  // After column live
+  setText('bva-after-cpu', d.cpu_pct.toFixed(1)+'%');
+  setBar('bva-bar-after-cpu', d.cpu_pct, 100);
+  setText('bva-after-gpu', d.gpu_util+'%');
+  setBar('bva-bar-after-gpu', d.gpu_util, 100);
+  setText('bva-after-gpupwr', d.gpu_power_w>0 ? d.gpu_power_w.toFixed(1)+' W':'— W');
+  setBar('bva-bar-after-gpupwr', d.gpu_power_w, maxPwr);
+  setText('bva-after-pwr', d.total_power_w.toFixed(1)+' W');
+  setBar('bva-bar-after-pwr', d.total_power_w, maxPwr);
+
+  // Delta pills (only if we have baseline)
+  if (bva_before.cpu != null) {
+    setDelta('dp-cpu', bva_before.cpu - d.cpu_pct, '% CPU');
+    setDelta('dp-gpu', bva_before.gpu  - d.gpu_util,'% GPU');
+    setDelta('dp-pwr', bva_before.pwr  - d.total_power_w,'W PWR');
+  }
+}
+
+function setDelta(id, delta, unit='') {
+  const el=document.getElementById(id);
+  if(!el) return;
+  if(delta==null){ el.className='delta-pill none'; el.innerHTML='<span>—</span>'; return; }
+  const pct = Math.abs(delta).toFixed(delta>0?1:1)+unit;
+  if(delta>0.5){
+    el.className='delta-pill saved';
+    el.innerHTML=`<span>↓<br>${pct}</span>`;
+  } else if(delta<-0.5){
+    el.className='delta-pill worse';
+    el.innerHTML=`<span>↑<br>${pct}</span>`;
+  } else {
+    el.className='delta-pill none';
+    el.innerHTML=`<span>~ 0</span>`;
+  }
+}
+
+// ── Charts ─────────────────────────────────────────────
+let chartPwr, chartGpu;
+
+function initCharts() {
+  Chart.defaults.color='#7a9e97'; Chart.defaults.font.family='Space Grotesk'; Chart.defaults.borderColor='rgba(255,255,255,0.05)';
+  const base={responsive:true,maintainAspectRatio:false,animation:{duration:0},
+    scales:{x:{grid:{display:false},ticks:{maxTicksLimit:8,font:{size:9}}},y:{beginAtZero:false,ticks:{font:{size:9}}}},
+    plugins:{legend:{display:false},tooltip:{backgroundColor:'rgba(5,8,7,0.95)',padding:8}}};
+
+  chartPwr=new Chart(document.getElementById('chart-power').getContext('2d'),{type:'line',
+    data:{labels:[],datasets:[
+      {label:'Total W',data:[],borderColor:'#d4a832',backgroundColor:'rgba(212,168,50,.06)',fill:true,tension:.4,borderWidth:2,pointRadius:0},
+      {label:'Baseline W',data:[],borderColor:'rgba(201,58,0,0.5)',backgroundColor:'transparent',fill:false,borderDash:[6,4],borderWidth:1.5,pointRadius:0}
+    ]},
+    options:{...base,scales:{...base.scales,y:{beginAtZero:false,title:{display:true,text:'Watts',font:{size:10}}}}}});
+
+  chartGpu=new Chart(document.getElementById('chart-gpu').getContext('2d'),{type:'line',
+    data:{labels:[],datasets:[
+      {label:'GPU %',data:[],borderColor:'#b07dd4',backgroundColor:'rgba(176,125,212,.06)',fill:true,tension:.4,borderWidth:2,pointRadius:0}
+    ]},
+    options:{...base,scales:{...base.scales,y:{min:0,max:100,title:{display:true,text:'%',font:{size:10}}}}}});
+}
+
+function pushCharts(d) {
+  const lbl=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  pwrHistory.push({t:lbl,pw:d.total_power_w,bw:d.baseline_w});
+  gpuHistory.push({t:lbl,g:d.gpu_util});
+  if(pwrHistory.length>MAX_H){pwrHistory.shift();gpuHistory.shift();}
+
+  chartPwr.data.labels=pwrHistory.map(x=>x.t);
+  chartPwr.data.datasets[0].data=pwrHistory.map(x=>x.pw);
+  chartPwr.data.datasets[1].data=pwrHistory.map(x=>x.bw??null);
+  chartPwr.update('none');
+
+  chartGpu.data.labels=gpuHistory.map(x=>x.t);
+  chartGpu.data.datasets[0].data=gpuHistory.map(x=>x.g);
+  chartGpu.update('none');
+}
+
+// ── Helpers ────────────────────────────────────────────
+function setText(id,v){const e=document.getElementById(id);if(e)e.textContent=v;}
+function setBar(id,v,max){const e=document.getElementById(id);if(e)e.style.width=Math.min(Math.max((v/max)*100,0),100)+'%';}
+function setBarVal(barId,txtId,v,max,unit){
+  setBar(barId,v,max);
+  setText(txtId, v.toFixed(1)+unit);
+}
+function showBanner(id,type,html){
+  const e=document.getElementById(id);
+  if(!e)return; e.style.display='block'; e.className='banner '+type; e.innerHTML=html;
+}
+
+function toast(msg,type='success'){
+  const n=document.getElementById('toast');
+  n.textContent=msg;
+  n.style.background=type==='error'?'var(--rust)':'var(--teal-l)';
+  n.style.color='#000'; n.style.opacity='1'; n.style.transform='translateX(-50%) translateY(0)';
+  setTimeout(()=>{n.style.opacity='0';n.style.transform='translateX(-50%) translateY(-20px)';},2800);
+}
+
+// ── THREE.JS ───────────────────────────────────────────
+let sGroup,gMesh,parts,rings=[],nGroup;
+const clk=new THREE.Clock();
+let tScale=1.0;
+
+function init3D(){
+  const cv=document.getElementById('three-bg');
+  const sc=new THREE.Scene();
+  const cam=new THREE.PerspectiveCamera(60,innerWidth/innerHeight,.1,100);
+  cam.position.z=8.5;
+  const rend=new THREE.WebGLRenderer({canvas:cv,alpha:true,antialias:true});
+  rend.setSize(innerWidth,innerHeight); rend.setPixelRatio(Math.min(devicePixelRatio,2));
+  const ctrl=new THREE.OrbitControls(cam,rend.domElement);
+  ctrl.enableDamping=true;ctrl.dampingFactor=.04;ctrl.enablePan=false;ctrl.enableZoom=false;
+
+  sGroup=new THREE.Group(); sc.add(sGroup);
+  sGroup.add(new THREE.Mesh(new THREE.IcosahedronGeometry(1.5,4),new THREE.MeshPhongMaterial({color:0x3c7f72,wireframe:true,transparent:true,opacity:.8})));
+  gMesh=new THREE.Mesh(new THREE.IcosahedronGeometry(1.7,4),new THREE.MeshBasicMaterial({color:0x5aad9d,wireframe:true,transparent:true,opacity:.15}));
+  sGroup.add(gMesh);
+
+  const pg=new THREE.BufferGeometry();
+  const pa=new Float32Array(9000);
+  for(let i=0;i<9000;i++)pa[i]=(Math.random()-.5)*40;
+  pg.setAttribute('position',new THREE.BufferAttribute(pa,3));
+  const pm=new THREE.PointsMaterial({color:0x3c7f72,size:.025,transparent:true});
+  parts=new THREE.Points(pg,pm); sc.add(parts);
+
+  [[3.5,.015,0xab8115,'x',.008],[4.2,.010,0x3c7f72,'y',.005],[5.,.008,0x992800,'z',.003]].forEach(([r,t,c,ax,s])=>{
+    const m=new THREE.Mesh(new THREE.TorusGeometry(r,t,16,100),new THREE.MeshBasicMaterial({color:c,transparent:true,opacity:.4}));
+    sc.add(m); rings.push({mesh:m,ax,s});
+  });
+
+  nGroup=new THREE.Group(); sc.add(nGroup);
+  [0xc93a00,0xd4a832,0x5aad9d,0xb07dd4].forEach((c,i)=>{
+    const m=new THREE.Mesh(new THREE.OctahedronGeometry(.2),new THREE.MeshPhongMaterial({color:c,transparent:true,opacity:.6}));
+    m.userData={ph:i*(Math.PI/2)};nGroup.add(m);
+  });
+
+  sc.add(new THREE.AmbientLight(0x0a2a22,1));
+  const pl=new THREE.PointLight(0x5aad9d,1.5,20);pl.position.set(5,5,5);sc.add(pl);
+
+  window.addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();rend.setSize(innerWidth,innerHeight);});
+
+  let lt=0;
+  (function anim(){
+    requestAnimationFrame(anim);
+    const t=clk.getElapsedTime();
+    const sc1=tScale+Math.sin(t*2)*.02;
+    sGroup.scale.lerp(new THREE.Vector3(sc1,sc1,sc1),.04);
+    sGroup.rotation.y+=.002;sGroup.rotation.x+=.0005;
+    gMesh.rotation.y-=.001;
+    const pos=parts.geometry.attributes.position.array;
+    for(let i=1;i<pos.length;i+=3){pos[i]+=.005;if(pos[i]>20)pos[i]=-20;}
+    parts.geometry.attributes.position.needsUpdate=true;
+    pm.opacity=Math.sin(t*.5)*.3+.5;
+    rings.forEach(r=>{r.mesh.rotation[r.ax]+=r.s;});
+    nGroup.children.forEach(n=>{
+      const p=n.userData.ph+t;
+      n.position.set(Math.cos(p)*2.8,Math.sin(p)*Math.cos(p),Math.sin(p)*2.8);
+      n.rotation.x+=.01;n.rotation.y+=.02;
+      n.scale.setScalar(1+.2*Math.sin(t*3+n.userData.ph));
+    });
+    lt+=.01; pl.position.x=Math.sin(lt)*6; pl.position.z=Math.cos(lt)*6;
+    ctrl.update(); rend.render(sc,cam);
+  })();
+}
+</script>
+</body>
+</html>
