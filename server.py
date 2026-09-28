@@ -18,6 +18,7 @@ import zipfile
 import statistics
 from datetime import datetime
 from collections import deque
+from pathlib import Path
 from typing import Optional, Dict, List, Any
 from concurrent.futures import ThreadPoolExecutor
 
@@ -28,12 +29,20 @@ from pydantic import BaseModel
 
 import requests
 import psutil
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import torch.nn.utils.prune as prune
-import torch.quantization
-from transformers import AutoModelForCausalLM, AutoTokenizer
+try:
+    import torch
+    import torch.nn as nn
+    import torch.nn.functional as F
+    import torch.nn.utils.prune as prune
+    import torch.quantization
+    from transformers import AutoModelForCausalLM, AutoTokenizer
+    TORCH_OK = True
+except Exception:
+    torch = None
+    AutoModelForCausalLM = None
+    AutoTokenizer = None
+    TORCH_OK = False
+
 
 # ── Hardware Integrations ──
 try:
@@ -427,6 +436,8 @@ def reset_gpu_power_cap() -> dict:
 # SECTION 6 — FASTAPI APP + ALL ENDPOINTS
 # ==========================================
 
+BASE_DIR = Path(__file__).resolve().parent
+
 app = FastAPI(title="Zerotrace AI — Global AI Tracker")
 app.add_middleware(
     CORSMiddleware,
@@ -437,7 +448,10 @@ app.add_middleware(
 
 @app.get("/")
 def serve_frontend():
-    return FileResponse("index.html")
+    idx = BASE_DIR / "index.html"
+    if idx.exists():
+        return FileResponse(str(idx))
+    return {"status": "ok", "service": "Zerotrace AI"}
 
 @app.get("/health")
 def health():
@@ -930,6 +944,8 @@ async def load_local_model(model_file: UploadFile = File(...)):
 
     _active_ollama_model = None
     _phase = "idle"
+    if not TORCH_OK:
+        return {"success": False, "error": "PyTorch is required for local models. Install with: pip install torch transformers"}
     filename = model_file.filename
     ext      = os.path.splitext(filename)[1].lower()
     tmp_dir  = tempfile.mkdtemp()
@@ -995,6 +1011,8 @@ async def load_hf_model(payload: dict):
 
     _active_ollama_model = None
     _phase = "idle"
+    if not TORCH_OK:
+        return {"success": False, "error": "PyTorch is required for HuggingFace models. Install with: pip install torch transformers"}
     model_id = payload.get("model_id", "").strip()
     if not model_id:
         raise HTTPException(400, "model_id is required")
