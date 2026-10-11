@@ -20,8 +20,11 @@ htmlcov/
 .env
 .env.local
 
-# Models & Weights caches
-models/
+# Top-level models directory and weights (do NOT ignore zerotrace/models code package)
+/models/
+!zerotrace/models/
+!zerotrace/models/*.py
+!zerotrace/models/__init__.py
 huggingface/
 *.safetensors
 *.bin
