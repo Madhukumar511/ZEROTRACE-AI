@@ -346,15 +346,71 @@ label.form-lbl { display:block; font-size:.75rem; color:var(--txt-dim); margin-b
 @keyframes wordReveal{ from{opacity:0;transform:translateY(18px);filter:blur(4px)} to{opacity:1;transform:translateY(0);filter:blur(0)} }
 @keyframes pulse     { 0%,100%{opacity:1;box-shadow:0 0 8px currentColor} 50%{opacity:.4;box-shadow:none} }
 @keyframes spin      { to{transform:rotate(360deg)} }
+@keyframes numFlash  { 0%{opacity:1} 30%{opacity:.3;transform:scale(1.08)} 100%{opacity:1;transform:scale(1)} }
+@keyframes scorePop  { 0%{transform:scale(1)} 40%{transform:scale(1.04)} 100%{transform:scale(1)} }
+
+/* ── Hero Live Power Dashboard tiles ─────────────────────── */
+.hero-power-grid {
+  display:grid; grid-template-columns:repeat(4,1fr); gap:1rem;
+  width:100%; max-width:900px; margin:2.2rem auto 0;
+}
+.hero-power-tile {
+  background:rgba(0,0,0,0.5); border-radius:12px;
+  padding:1.2rem 1rem; text-align:center;
+  border:1px solid rgba(255,255,255,0.07);
+  backdrop-filter:blur(14px); transition:border-color .4s;
+}
+.hero-power-tile:hover { border-color:rgba(255,255,255,0.16); }
+.hpt-label { font-size:.6rem; text-transform:uppercase; letter-spacing:2px; color:var(--txt-dim); margin-bottom:.45rem; font-family:var(--mono); }
+.hpt-value { font-family:var(--mono); font-size:1.85rem; font-weight:700; line-height:1; }
+.hpt-value.flash { animation:numFlash .3s ease; }
+.hpt-unit  { font-size:.65rem; color:var(--txt-dim); margin-top:.3rem; font-family:var(--mono); }
+.hpt-bar   { height:3px; border-radius:2px; background:rgba(255,255,255,.06); margin-top:.8rem; overflow:hidden; }
+.hpt-bar-fill { height:100%; border-radius:2px; transition:width .5s ease; }
+.hpt-divider { display:flex; align-items:center; justify-content:center; font-family:var(--mono); font-size:.6rem; color:var(--txt-dim); gap:.4rem; padding:.4rem 0; }
+.hpt-divider::before, .hpt-divider::after { content:''; flex:1; height:1px; background:rgba(255,255,255,.05); }
+
+/* ── Big Scoreboard tiles ────────────────────────────────── */
+.scoreboard-grid {
+  display:grid; grid-template-columns:repeat(4,1fr); gap:1.2rem;
+}
+.score-tile {
+  border-radius:14px; padding:1.8rem 1.2rem 1.5rem; text-align:center;
+  position:relative; overflow:hidden; transition:transform .3s, box-shadow .3s;
+}
+.score-tile:hover { transform:translateY(-3px); }
+.score-tile.teal   { background:linear-gradient(150deg,rgba(90,173,157,.14),rgba(0,0,0,.5)); border:1px solid rgba(90,173,157,.35); }
+.score-tile.gold   { background:linear-gradient(150deg,rgba(212,168,50,.14),rgba(0,0,0,.5));  border:1px solid rgba(212,168,50,.35); }
+.score-tile.green  { background:linear-gradient(150deg,rgba(46,204,113,.14),rgba(0,0,0,.5));  border:1px solid rgba(46,204,113,.35); }
+.score-tile.purple { background:linear-gradient(150deg,rgba(176,125,212,.14),rgba(0,0,0,.5)); border:1px solid rgba(176,125,212,.35); }
+.score-tile.updating { animation:scorePop .3s ease; }
+.score-icon  { font-size:1.5rem; margin-bottom:.5rem; }
+.score-label { font-size:.62rem; text-transform:uppercase; letter-spacing:2px; color:var(--txt-dim); margin-bottom:.6rem; font-family:var(--mono); }
+.score-main  { font-family:var(--mono); font-size:2.4rem; font-weight:700; line-height:1; margin-bottom:.35rem; }
+.score-sub   { font-size:.7rem; color:var(--txt-dim); font-family:var(--mono); min-height:1.1rem; }
+.score-live-dot { display:inline-block; width:6px; height:6px; border-radius:50%; background:currentColor; animation:livePing 1.4s ease-out infinite; vertical-align:middle; margin-right:4px; }
+
+/* ── Header live watt badge ──────────────────────────────── */
+#hdr-live-w {
+  display:flex; align-items:center; gap:6px;
+  background:rgba(0,0,0,.4); border:1px solid rgba(255,255,255,.08);
+  border-radius:20px; padding:4px 12px;
+  font-family:var(--mono); font-size:.72rem; color:var(--txt-dim);
+  transition:all .4s;
+}
+#hdr-live-w.active { color:var(--teal-l); border-color:rgba(90,173,157,.28); }
+#hdr-live-w-dot { width:6px; height:6px; border-radius:50%; background:currentColor; }
 
 /* ── Footer ──────────────────────────────────────────────── */
 footer { text-align:center; padding:2.5rem 2rem; border-top:1px solid rgba(255,255,255,.05); color:var(--txt-dim); font-size:.85rem; line-height:1.8; }
 
 /* ── Responsive ──────────────────────────────────────────── */
-@media(max-width:1100px){ .dash-layout{grid-template-columns:1fr;} .live-panel{position:static;} }
-@media(max-width:900px) { .connect-grid{grid-template-columns:1fr;} .bva-panel .bva-body{grid-template-columns:1fr;} .bva-panel .bva-header{grid-template-columns:1fr;} .bva-mid,.bva-col-head.vs{display:none;} .charts-grid{grid-template-columns:1fr;} }
-@media(max-width:720px) { .baseline-strip{grid-template-columns:1fr 1fr;} .saving-big{font-size:2rem;} .header-right{display:none;} }
+@media(max-width:1100px){ .dash-layout{grid-template-columns:1fr;} .live-panel{position:static;} .scoreboard-grid{grid-template-columns:1fr 1fr;} }
+@media(max-width:900px) { .connect-grid{grid-template-columns:1fr;} .bva-panel .bva-body{grid-template-columns:1fr;} .bva-panel .bva-header{grid-template-columns:1fr;} .bva-mid,.bva-col-head.vs{display:none;} .charts-grid{grid-template-columns:1fr;} .hero-power-grid{grid-template-columns:1fr 1fr;} }
+@media(max-width:720px) { .baseline-strip{grid-template-columns:1fr 1fr;} .saving-big{font-size:2rem;} .header-right{display:none;} .scoreboard-grid{grid-template-columns:1fr 1fr;} }
+@media(max-width:480px) { .scoreboard-grid{grid-template-columns:1fr;} .hero-power-grid{grid-template-columns:1fr 1fr;} }
 </style>
+
 </head>
 <body>
 <div class="scanlines"></div>
@@ -380,12 +436,13 @@ footer { text-align:center; padding:2.5rem 2rem; border-top:1px solid rgba(255,2
 
   </div>
   <div class="header-right">
+    <div id="hdr-live-w"><div id="hdr-live-w-dot"></div><span id="hdr-live-w-txt">— W</span></div>
     <span id="hdr-profile" style="color:var(--txt-dim);">No optimization</span>
     <span id="live-clock">00:00:00</span>
   </div>
 </header>
 
-<div class="hero-container" style="padding-top:64px;">
+<div class="hero-container" style="padding-top:64px;min-height:90vh;">
   <div class="hero">
     <h1>
       <span class="hw t" style="animation-delay:500ms">Zero</span>
@@ -393,62 +450,97 @@ footer { text-align:center; padding:2.5rem 2rem; border-top:1px solid rgba(255,2
       <span class="hw t" style="animation-delay:700ms">Zero</span>
       <span class="hw" style="animation-delay:800ms">Compromise.</span>
     </h1>
-    <p>Select one of your downloaded Ollama models, measure real CPU/GPU baseline, apply an optimization, and watch the live reduction in hardware load — all in one screen.</p>
+    <p>ZeroTrace AI measures real CPU &amp; GPU wattage via NVML &amp; RAPL, compresses prompts with Caveman syntax, and bypasses model compute with a 384-D vector cache — eliminating electricity waste on local &amp; cloud inference.</p>
     <div class="btn-row">
-      <button class="btn btn-teal" onclick="scrollTo('connect-sec')">↓ CONNECT MODEL</button>
+      <button class="btn btn-teal" onclick="scrollTo('chat-sec')">💬 LIVE GREEN CHAT</button>
+      <button class="btn btn-gold" onclick="scrollTo('connect-sec')">⚡ CONNECT MODEL</button>
       <button class="btn btn-ghost" onclick="scrollTo('compare-sec')">LIVE COMPARISON</button>
+    </div>
+
+    <!-- Live Power & Efficiency Grid directly in Hero -->
+    <div class="hero-power-grid">
+      <div class="hero-power-tile">
+        <div class="hpt-label">Current Power Draw</div>
+        <div class="hpt-value txt-teal" id="hero-live-w">— W</div>
+        <div class="hpt-unit">Live NVML + RAPL</div>
+        <div class="hpt-bar"><div class="hpt-bar-fill cl" id="hero-live-bar" style="width:0%"></div></div>
+      </div>
+      <div class="hero-power-tile">
+        <div class="hpt-label">Baseline Power</div>
+        <div class="hpt-value txt-rust" id="hero-baseline-w">— W</div>
+        <div class="hpt-unit" id="hero-baseline-sub">Awaiting benchmark</div>
+        <div class="hpt-bar"><div class="hpt-bar-fill rr" id="hero-baseline-bar" style="width:0%"></div></div>
+      </div>
+      <div class="hero-power-tile">
+        <div class="hpt-label">Real-Time Saving</div>
+        <div class="hpt-value txt-teal" id="hero-saving-pct">—</div>
+        <div class="hpt-unit" id="hero-saving-sub">Measure baseline first</div>
+        <div class="hpt-bar"><div class="hpt-bar-fill tw" id="hero-saving-bar" style="width:0%"></div></div>
+      </div>
+      <div class="hero-power-tile">
+        <div class="hpt-label">Grid Carbon Intensity</div>
+        <div class="hpt-value" style="color:var(--green-l);" id="hero-carbon-intensity">—</div>
+        <div class="hpt-unit">gCO₂ / kWh</div>
+        <div class="hpt-bar"><div class="hpt-bar-fill" style="background:var(--green-l);width:55%;"></div></div>
+      </div>
     </div>
   </div>
 </div>
 
 <main class="container">
 
-<!-- ── ZeroTrace Global Live Green Impact Ticker ──────────────── -->
-<div class="card card-pad" style="margin-bottom:2rem;background:linear-gradient(135deg, rgba(90,173,157,0.12) 0%, rgba(5,8,7,0.85) 100%);border:1px solid rgba(90,173,157,0.35);position:relative;overflow:hidden;">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.2rem;flex-wrap:wrap;gap:1rem;">
-    <div style="display:flex;align-items:center;gap:.8rem;">
-      <div style="width:36px;height:36px;border-radius:8px;background:rgba(90,173,157,0.2);border:1px solid var(--teal-l);display:flex;align-items:center;justify-content:center;">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--teal-l)" stroke-width="2.2" stroke-linecap="round"><path d="M12 2C6 2 3 8 3 14c0 4 2.5 7 5 8 0-4 1-7 4-9-1 3-1 6 0 9 2.5-1 5-4 5-8 0-6-3-12-5-12z"/></svg>
+<!-- ── ZeroTrace Global Live Green Impact Scoreboard ──────────────── -->
+<div class="card card-pad" style="margin-bottom:2.5rem;background:linear-gradient(135deg, rgba(90,173,157,0.14) 0%, rgba(5,8,7,0.92) 100%);border:1px solid rgba(90,173,157,0.38);position:relative;overflow:hidden;box-shadow:0 16px 40px rgba(0,0,0,0.5);">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.6rem;flex-wrap:wrap;gap:1rem;">
+    <div style="display:flex;align-items:center;gap:.9rem;">
+      <div style="width:42px;height:42px;border-radius:10px;background:rgba(90,173,157,0.22);border:1.5px solid var(--teal-l);display:flex;align-items:center;justify-content:center;box-shadow:0 0 15px rgba(90,173,157,0.25);">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--teal-l)" stroke-width="2.2" stroke-linecap="round"><path d="M12 2C6 2 3 8 3 14c0 4 2.5 7 5 8 0-4 1-7 4-9-1 3-1 6 0 9 2.5-1 5-4 5-8 0-6-3-12-5-12z"/></svg>
       </div>
       <div>
-        <div style="font-weight:700;color:#fff;font-size:1.05rem;display:flex;align-items:center;gap:.6rem;">
+        <div style="font-weight:700;color:#fff;font-size:1.15rem;display:flex;align-items:center;gap:.6rem;letter-spacing:.3px;">
           <span>ZeroTrace Live Green Impact Scoreboard</span>
-          <span class="live-ring" style="display:inline-block;width:8px;height:8px;"></span>
+          <span class="live-ring" style="display:inline-block;width:9px;height:9px;"></span>
         </div>
-        <div style="font-size:.75rem;color:var(--txt-dim);">Real-time cumulative electricity, token, and carbon savings across your session</div>
+        <div style="font-size:.78rem;color:var(--txt-dim);margin-top:2px;">Real-time cumulative electricity, token, and carbon savings across all queries &amp; optimizations</div>
       </div>
     </div>
-    <div style="display:flex;gap:.6rem;">
-      <button class="btn btn-teal" onclick="scrollTo('chat-sec')" style="padding:.4rem .9rem;font-size:.78rem;">💬 GREEN CHAT (0W CACHE)</button>
+    <div style="display:flex;gap:.8rem;align-items:center;">
+      <span style="font-family:var(--mono);font-size:.72rem;color:var(--txt-dim);background:rgba(0,0,0,0.4);padding:5px 12px;border-radius:15px;border:1px solid rgba(255,255,255,0.08);">● REAL-TIME TELEMETRY</span>
+      <button class="btn btn-teal" onclick="scrollTo('chat-sec')" style="padding:.45rem 1rem;font-size:.78rem;">⚡ GREEN CHAT GATEWAY</button>
     </div>
   </div>
 
-  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1rem;">
-    <div class="card" style="padding:1.1rem;background:rgba(0,0,0,0.45);border:1px solid rgba(90,173,157,0.25);text-align:center;">
-      <div style="font-size:.68rem;color:var(--txt-dim);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Electricity Saved</div>
-      <div id="live-saved-joules" style="font-family:var(--mono);font-size:1.6rem;font-weight:700;color:var(--teal-l);">0.0 J</div>
-      <div id="live-saved-wh" style="font-size:.72rem;color:var(--txt-dim);font-family:var(--mono);margin-top:2px;">0.000 Wh</div>
+  <div class="scoreboard-grid">
+    <div class="score-tile teal" id="tile-saved-joules">
+      <div class="score-icon">⚡</div>
+      <div class="score-label"><span class="score-live-dot" style="color:var(--teal-l);"></span>Electricity Saved</div>
+      <div id="live-saved-joules" class="score-main txt-teal">0.0 J</div>
+      <div id="live-saved-wh" class="score-sub">0.000 Wh saved</div>
     </div>
 
-    <div class="card" style="padding:1.1rem;background:rgba(0,0,0,0.45);border:1px solid rgba(212,168,50,0.25);text-align:center;">
-      <div style="font-size:.68rem;color:var(--txt-dim);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Tokens Saved</div>
-      <div id="live-saved-tokens" style="font-family:var(--mono);font-size:1.6rem;font-weight:700;color:var(--gold-l);">0</div>
-      <div style="font-size:.72rem;color:var(--txt-dim);font-family:var(--mono);margin-top:2px;">~65% Caveman Cut</div>
+    <div class="score-tile gold" id="tile-saved-tokens">
+      <div class="score-icon">✂️</div>
+      <div class="score-label"><span class="score-live-dot" style="color:var(--gold-l);"></span>Tokens Saved</div>
+      <div id="live-saved-tokens" class="score-main txt-gold">0</div>
+      <div class="score-sub">~65% Caveman Compression</div>
     </div>
 
-    <div class="card" style="padding:1.1rem;background:rgba(0,0,0,0.45);border:1px solid rgba(46,204,113,0.25);text-align:center;">
-      <div style="font-size:.68rem;color:var(--txt-dim);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Carbon Prevented</div>
-      <div id="live-saved-carbon" style="font-family:var(--mono);font-size:1.6rem;font-weight:700;color:#2ecc71;">0.0000 g</div>
-      <div style="font-size:.72rem;color:var(--txt-dim);font-family:var(--mono);margin-top:2px;">gCO₂ emissions</div>
+    <div class="score-tile green" id="tile-saved-carbon">
+      <div class="score-icon">🌱</div>
+      <div class="score-label"><span class="score-live-dot" style="color:var(--green-l);"></span>Carbon Prevented</div>
+      <div id="live-saved-carbon" class="score-main" style="color:var(--green-l);">0.0000 g</div>
+      <div class="score-sub">gCO₂ grid emissions offset</div>
     </div>
 
-    <div class="card" style="padding:1.1rem;background:rgba(0,0,0,0.45);border:1px solid rgba(176,125,212,0.25);text-align:center;">
-      <div style="font-size:.68rem;color:var(--txt-dim);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">0-Watt Cache Hits</div>
-      <div id="live-saved-hits" style="font-family:var(--mono);font-size:1.6rem;font-weight:700;color:var(--purple-l);">0</div>
-      <div id="live-cache-size" style="font-size:.72rem;color:var(--txt-dim);font-family:var(--mono);margin-top:2px;">4 items in memory</div>
+    <div class="score-tile purple" id="tile-saved-hits">
+      <div class="score-icon">🎯</div>
+      <div class="score-label"><span class="score-live-dot" style="color:var(--purple-l);"></span>0-Watt Cache Hits</div>
+      <div id="live-saved-hits" class="score-main txt-purple">0</div>
+      <div id="live-cache-size" class="score-sub">4 items in semantic store</div>
     </div>
   </div>
 </div>
+
 
 <section id="howto-sec">
   <div class="section-tag">00 — STARTUP GUIDE</div>
@@ -492,16 +584,17 @@ footer { text-align:center; padding:2.5rem 2rem; border-top:1px solid rgba(255,2
         </div>
       </div>
       <div style="background:#000;border-radius:8px;padding:1rem 1.2rem;font-family:var(--mono);font-size:.85rem;line-height:1.9;border:1px solid rgba(255,255,255,.06);">
-        <div style="color:var(--txt-dim);margin-bottom:.3rem;"># Navigate to the project folder</div>
-        <div><span style="color:var(--teal-l);">$</span> <span style="color:#fff;">cd C:\Users\Admin\Downloads\zzz</span></div>
-        <div style="margin-top:.4rem;color:var(--txt-dim);"># Start the API server</div>
+        <div style="color:var(--txt-dim);margin-bottom:.3rem;"># 1-Click launcher (creates venv &amp; installs dependencies)</div>
+        <div><span style="color:var(--teal-l);">$</span> <span style="color:#fff;">./run.sh</span> <span style="color:var(--txt-dim);font-size:.72rem;">(Linux / macOS)</span></div>
+        <div><span style="color:var(--teal-l);">&gt;</span> <span style="color:#fff;">run.bat</span> <span style="color:var(--txt-dim);font-size:.72rem;">(Windows PowerShell / CMD)</span></div>
+        <div style="margin-top:.6rem;color:var(--txt-dim);"># Or start manually:</div>
         <div><span style="color:var(--teal-l);">$</span> <span style="color:#fff;">python server.py</span></div>
-        <div style="margin-top:.6rem;color:var(--txt-dim);font-size:.75rem;">↳ Opens on http://localhost:8000</div>
+        <div style="margin-top:.4rem;color:var(--txt-dim);font-size:.75rem;">↳ Opens on http://localhost:8000</div>
       </div>
       <div style="margin-top:1rem;">
         <div style="background:#000;border-radius:6px;padding:.7rem 1rem;font-family:var(--mono);font-size:.8rem;border:1px solid rgba(255,255,255,.05);">
-          <div style="color:var(--txt-dim);margin-bottom:.3rem;"># If missing packages, install first:</div>
-          <div><span style="color:var(--teal-l);">$</span> <span style="color:#fff;">pip install fastapi uvicorn psutil requests</span></div>
+          <div style="color:var(--txt-dim);margin-bottom:.3rem;"># To install all dependencies:</div>
+          <div><span style="color:var(--teal-l);">$</span> <span style="color:#fff;">pip install -r requirements.txt</span></div>
         </div>
       </div>
       <div id="terminal2-status" style="margin-top:1rem;" class="banner warn">⏳ Checking Python API…</div>
@@ -1331,7 +1424,13 @@ async function runBenchmark() {
 
 let _carbon = 214;
 function getCarbon() { return _carbon; }
-function updateCarbon(v) { _carbon=v; document.getElementById('lv-carbon').textContent = v.toFixed(1)+' gCO₂/kWh'; }
+function updateCarbon(v) {
+  _carbon = v;
+  const el = document.getElementById('lv-carbon');
+  if (el) el.textContent = v.toFixed(1) + ' gCO₂/kWh';
+  const heroEl = document.getElementById('hero-carbon-intensity');
+  if (heroEl) heroEl.textContent = v.toFixed(0);
+}
 
 function freezeBeforeColumn() {
   const b = bva_before;
@@ -1562,7 +1661,27 @@ function updateLiveSidebar(d) {
   setBarVal('lv-total-bar','lv-total',d.total_power_w,maxPwr,' W');
   setText('lv-current-w', d.total_power_w.toFixed(1)+' W');
 
-  // Saving
+  // Header live power badge
+  const hdrWatt = document.getElementById('hdr-live-w');
+  const hdrWattTxt = document.getElementById('hdr-live-w-txt');
+  if (hdrWattTxt && d.total_power_w != null) {
+    hdrWattTxt.textContent = d.total_power_w.toFixed(1) + ' W';
+    if (hdrWatt) hdrWatt.classList.add('active');
+  }
+
+  // Hero Live Power Grid updates
+  if (d.total_power_w != null) {
+    setText('hero-live-w', d.total_power_w.toFixed(1) + ' W');
+    setBar('hero-live-bar', d.total_power_w, maxPwr);
+  }
+  if (d.baseline_w != null) {
+    setText('hero-baseline-w', d.baseline_w.toFixed(1) + ' W');
+    setText('hero-baseline-sub', 'Measured pre-opt load');
+    setBar('hero-baseline-bar', d.baseline_w, maxPwr);
+    setText('lv-baseline-w', d.baseline_w.toFixed(1)+' W');
+  }
+
+  // Saving calculations
   if (d.saving_pct!=null) {
     const sp=d.saving_pct;
     setText('lv-saving-big',(sp>=0?'↓':'↑')+Math.abs(sp).toFixed(1)+'%');
@@ -1572,25 +1691,57 @@ function updateLiveSidebar(d) {
     document.getElementById('sav-big').style.color = sp>=0?'var(--teal-l)':'var(--rust-l)';
     setText('sav-sub', sp>=0?'energy reduction vs baseline':'energy increase vs baseline');
     if(d.saving_w!=null) setText('sav-watts',(d.saving_w>=0?'−':'+')+Math.abs(d.saving_w).toFixed(1)+' W');
-  }
-  if(d.baseline_w) setText('lv-baseline-w',d.baseline_w.toFixed(1)+' W');
 
-  // Live Green Impact Scoreboard updates
+    // Hero saving tile
+    setText('hero-saving-pct', (sp>=0?'↓ ':'↑ ')+Math.abs(sp).toFixed(1)+'%');
+    const heroSav = document.getElementById('hero-saving-pct');
+    if (heroSav) heroSav.style.color = sp>=0?'var(--teal-l)':'var(--rust-l)';
+    if(d.saving_w!=null) {
+      setText('hero-saving-sub', (d.saving_w>=0?'−':'+')+Math.abs(d.saving_w).toFixed(1)+' W vs baseline');
+    }
+    setBar('hero-saving-bar', Math.max(0, Math.min(100, Math.abs(sp))), 100);
+  }
+
+  // Live Green Impact Scoreboard updates with animation
   if (d.total_energy_saved_j != null) {
-    setText('live-saved-joules', d.total_energy_saved_j.toFixed(1) + ' J');
-    setText('live-saved-wh', (d.total_energy_saved_j / 3600.0).toFixed(3) + ' Wh');
+    const newVal = d.total_energy_saved_j.toFixed(1) + ' J';
+    const el = document.getElementById('live-saved-joules');
+    if (el && el.textContent !== newVal) {
+      el.textContent = newVal;
+      const tile = document.getElementById('tile-saved-joules');
+      if (tile) { tile.classList.add('updating'); setTimeout(() => tile.classList.remove('updating'), 350); }
+    }
+    setText('live-saved-wh', (d.total_energy_saved_j / 3600.0).toFixed(3) + ' Wh saved');
   }
   if (d.total_tokens_saved != null) {
-    setText('live-saved-tokens', d.total_tokens_saved.toLocaleString());
+    const newVal = d.total_tokens_saved.toLocaleString();
+    const el = document.getElementById('live-saved-tokens');
+    if (el && el.textContent !== newVal) {
+      el.textContent = newVal;
+      const tile = document.getElementById('tile-saved-tokens');
+      if (tile) { tile.classList.add('updating'); setTimeout(() => tile.classList.remove('updating'), 350); }
+    }
   }
   if (d.total_carbon_saved_g != null) {
-    setText('live-saved-carbon', d.total_carbon_saved_g.toFixed(4) + ' g');
+    const newVal = d.total_carbon_saved_g.toFixed(4) + ' g';
+    const el = document.getElementById('live-saved-carbon');
+    if (el && el.textContent !== newVal) {
+      el.textContent = newVal;
+      const tile = document.getElementById('tile-saved-carbon');
+      if (tile) { tile.classList.add('updating'); setTimeout(() => tile.classList.remove('updating'), 350); }
+    }
   }
   if (d.total_cache_hits != null) {
-    setText('live-saved-hits', d.total_cache_hits.toString());
+    const newVal = d.total_cache_hits.toString();
+    const el = document.getElementById('live-saved-hits');
+    if (el && el.textContent !== newVal) {
+      el.textContent = newVal;
+      const tile = document.getElementById('tile-saved-hits');
+      if (tile) { tile.classList.add('updating'); setTimeout(() => tile.classList.remove('updating'), 350); }
+    }
   }
   if (d.cache_size != null) {
-    setText('live-cache-size', d.cache_size + ' items in memory');
+    setText('live-cache-size', d.cache_size + ' items in semantic store');
   }
 
   // ── Global Radar & Phase Logic ───────────────────
@@ -2000,6 +2151,11 @@ async function sendChatMessage() {
     } else if (data.tokens_saved > 0) {
       toast(`Caveman saved ${data.tokens_saved} prompt tokens!`);
     }
+
+    // Instantly refresh live telemetry scoreboard
+    fetch(`${API}/api/telemetry/live`).then(r => r.json()).then(liveData => {
+      if (liveData) updateLiveSidebar(liveData);
+    }).catch(() => {});
 
   } catch (err) {
     loadingDiv.remove();
