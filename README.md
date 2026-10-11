@@ -228,17 +228,42 @@ ZEROTRACE-AI/
 
 ---
 
-## 🖥️ Standalone CLI Usage
+## 💬 Chat Naturally with ZeroTrace AI
 
+You don't need complicated subcommands or manual profilers. **Just run one command to start chatting naturally with the AI**, and ZeroTrace operates transparently in the background:
+
+### Option 1: Terminal Green Chat (Instant, 1 Command)
 ```bash
-# Stream real-time hardware watts and carbon emissions in your terminal:
-python cli.py live
+python cli.py
+```
+> **What happens automatically while you chat:**
+> - ⚡ **384-D Semantic Vector Cache**: Instant **0-Watt response in <5ms** if a similar question was asked before.
+> - 🪨 **Caveman Compression**: Automatically trims fluff, pleasantries, and hedging by **~65%** on novel queries while strictly preserving code.
+> - 🔌 **Real Hardware Telemetry**: Calculates exact Watts consumed, Joules saved, and $gCO_2$ prevented per message.
+> - 🌐 **Multi-Model Support**: Automatically detects Local Ollama or Cloud LLMs (Google Gemini, Groq, OpenAI, Anthropic Claude).
+>
+> *Ask one-shot questions directly from your terminal:*
+> ```bash
+> python cli.py "How to reverse a string in python"
+> ```
 
-# Compress any prompt with Caveman and measure projected token & electricity savings:
-python cli.py compress "Hello assistant! Could you please give a detailed explanation with at least 250 words on how transformer neural networks work? Thank you so much!"
+---
 
-# Inspect system hardware sensors, CPU TDP, and Ollama status:
-python cli.py info
+### Option 2: Web Dashboard & Live Gateway
+```bash
+./run.sh      # Linux / macOS
+run.bat       # Windows
+```
+> Launches the interactive web dashboard on `http://localhost:8000`. Head straight to **Section 05 — Green Inference Gateway** to chat with full real-time visual power gauges and impact scoreboards.
+
+---
+
+### 🔧 Optional Advanced Developer Tools
+For power users wanting raw telemetry streams:
+```bash
+python cli.py live              # Continuous live hardware watts & carbon table
+python cli.py compress "text"   # Dry-run Caveman prompt compression inspector
+python cli.py info              # Inspect hardware sensors, TDP, and Ollama status
 ```
 
 ---

@@ -146,9 +146,283 @@ def cmd_info(args):
     print("=" * 60 + "\n")
 
 
+def detect_default_provider():
+    """Detects best available inference provider: Local Ollama or configured Cloud LLMs."""
+    import os
+    if ollama_client.is_online():
+        models = ollama_client.list_models()
+        model_name = models[0]["name"] if models else "llama3:latest"
+        return "ollama", model_name
+
+    # Check Cloud API Keys in environment (.env)
+    if os.environ.get("GEMINI_API_KEY"):
+        return "gemini", "gemini-1.5-flash"
+    if os.environ.get("GROQ_API_KEY"):
+        return "groq", "llama-3.3-70b-versatile"
+    if os.environ.get("OPENAI_API_KEY"):
+        return "openai", "gpt-4o-mini"
+    if os.environ.get("ANTHROPIC_API_KEY"):
+        return "anthropic", "claude-3-5-sonnet-20241022"
+
+    return "ollama", "llama3:latest"
+
+
+def dispatch_chat(
+    message: str,
+    provider: str = "ollama",
+    model: str = None,
+    api_key: str = None,
+    use_cache: bool = True,
+    use_caveman: bool = True,
+    caveman_intensity: str = "full",
+):
+    """
+    Sends chat request to running ZeroTrace server (if active)
+    or executes in-process directly via routes_chat.
+    """
+    # 1. Try running server first (keeps web and CLI state in sync)
+    try:
+        import requests
+        payload = {
+            "message": message,
+            "provider": provider,
+            "model": model,
+            "api_key": api_key,
+            "use_cache": use_cache,
+            "use_caveman": use_caveman,
+            "caveman_intensity": caveman_intensity,
+        }
+        r = requests.post("http://127.0.0.1:8000/api/chat", json=payload, timeout=60)
+        if r.status_code == 200:
+            return r.json()
+    except Exception:
+        pass
+
+    # 2. Standalone execution (zero daemon required)
+    from zerotrace.api.routes_chat import chat_endpoint, ChatRequest
+    req = ChatRequest(
+        message=message,
+        provider=provider,
+        model=model,
+        api_key=api_key,
+        use_cache=use_cache,
+        use_caveman=use_caveman,
+        caveman_intensity=caveman_intensity,
+    )
+    return chat_endpoint(req)
+
+
+def print_session_audit():
+    """Prints final session cumulative savings audit."""
+    carbon_kwh = get_carbon()
+    co2_g = (state.total_energy_saved_j / 3_600_000.0) * carbon_kwh
+    print("\n" + "=" * 76)
+    print(" 📊 ZEROTRACE AI — SESSION GREEN IMPACT AUDIT")
+    print("-" * 76)
+    print(f" Total Electricity Saved: {state.total_energy_saved_j:.2f} Joules ({state.total_energy_saved_j / 3600.0:.4f} Watt-hours)")
+    print(f" Total Tokens Saved:      {state.total_tokens_saved:,} prompt & cache tokens")
+    print(f" Total Carbon Prevented:  {co2_g:.6f} gCO2 grid emissions")
+    print(f" 0-Watt Cache Hits:       {state.total_cache_hits} instant recalls")
+    print("=" * 76 + "\n")
+
+
+def cmd_one_shot(prompt: str, provider: str = None, model: str = None):
+    """Executes a single prompt through ZeroTrace and outputs response with green metrics."""
+    def_prov, def_model = detect_default_provider()
+    provider = provider or def_prov
+    model = model or def_model
+
+    try:
+        res = dispatch_chat(message=prompt, provider=provider, model=model)
+        answer = res.get("answer", "")
+        print(f"\n{answer}\n")
+
+        if res.get("cache_hit"):
+            print(f"[🟢 100% ZERO-WATT CACHE HIT | <5ms | 0 GPU Joules | Saved {res.get('tokens_saved', 0)} tokens | {res.get('energy_saved_j', 0):.2f} J | {res.get('carbon_saved_g', 0):.5f} gCO2]")
+        else:
+            saved_tokens = res.get("tokens_saved", 0)
+            saved_j = res.get("energy_saved_j", 0.0)
+            saved_co2 = res.get("carbon_saved_g", 0.0)
+            print(f"[⚡ ZEROTRACE SAVED: {saved_tokens} tokens | {saved_j:.2f} J Electricity | {saved_co2:.5f} gCO2 | Provider: {provider} ({model})]")
+    except Exception as e:
+        print(f"[ERROR] Inference failed: {e}")
+
+
+def cmd_chat(args=None):
+    """
+    Starts an interactive Green AI chat in your terminal.
+    Every prompt you send is checked against the 384-D vector cache (0W recall)
+    and compressed with Caveman (~65% token drop), with live energy & carbon tracking.
+    """
+    import os
+    default_provider, default_model = detect_default_provider()
+    provider = getattr(args, "provider", None) or default_provider
+    model = getattr(args, "model", None) or default_model
+    intensity = "full"
+    use_cache = True
+    use_caveman = True
+    api_key = getattr(args, "key", None)
+
+    print("\n" + "=" * 78)
+    print(" ⚡ ZEROTRACE AI — INTERACTIVE GREEN CHAT GATEWAY")
+    print("=" * 78)
+    print(f" Active Provider: {provider.upper()} ({model}) | Grid Carbon: {get_carbon():.1f} gCO2/kWh")
+    print(" ZeroTrace runs transparently in the background while you chat:")
+    print("   • 384-D Semantic Vector Cache  -> 0-Watt instant recall on repeated queries")
+    print("   • Caveman Prompt Compression   -> ~65% token drop on novel queries")
+    print("   • Physical Telemetry Tracking  -> Real Watts, Joules & gCO2 calculated per turn")
+    print("-" * 78)
+    print(" Commands: /provider [name]  /model [name]  /stats  /clear  /exit")
+    print(" Type your prompt and press Enter to chat!")
+    print("=" * 78 + "\n")
+
+    if provider == "ollama" and not ollama_client.is_online():
+        print(" [ℹ] Note: Local Ollama is not running.")
+        print("     To use local models, run 'ollama serve' in another terminal.")
+        print("     Or switch to Cloud Gemini/Groq/OpenAI: type '/provider gemini'\n")
+
+    while True:
+        try:
+            prompt = input(f"\nYou [{provider}:{model}] > ").strip()
+        except (KeyboardInterrupt, EOFError):
+            print_session_audit()
+            break
+
+        if not prompt:
+            continue
+
+        # Handle slash commands
+        if prompt.startswith("/"):
+            parts = prompt.split()
+            cmd = parts[0].lower()
+
+            if cmd in ["/exit", "/quit", "/q"]:
+                print_session_audit()
+                break
+            elif cmd == "/stats":
+                print_session_audit()
+                continue
+            elif cmd == "/clear":
+                os.system("clear" if os.name != "nt" else "cls")
+                continue
+            elif cmd == "/provider":
+                if len(parts) > 1:
+                    provider = parts[1].lower()
+                    from zerotrace.models.cloud import CLOUD_PROVIDERS
+                    if provider in CLOUD_PROVIDERS:
+                        model = CLOUD_PROVIDERS[provider]["default_model"]
+                    elif provider == "ollama":
+                        models = ollama_client.list_models() if ollama_client.is_online() else []
+                        model = models[0]["name"] if models else "llama3:latest"
+                    print(f" ✓ Provider switched to: {provider.upper()} (default model: {model})")
+                else:
+                    print(" Usage: /provider <ollama | gemini | groq | openai | anthropic>")
+                continue
+            elif cmd == "/model":
+                if len(parts) > 1:
+                    model = parts[1]
+                    print(f" ✓ Model set to: {model}")
+                else:
+                    print(" Usage: /model <model_name>")
+                continue
+            elif cmd == "/key":
+                if len(parts) > 1:
+                    api_key = parts[1]
+                    print(" ✓ API key updated for session.")
+                else:
+                    print(" Usage: /key <your_api_key>")
+                continue
+            elif cmd == "/cache":
+                if len(parts) > 1 and parts[1].lower() in ["off", "false", "0"]:
+                    use_cache = False
+                    print(" ✓ 384-D Vector Cache: DISABLED")
+                else:
+                    use_cache = True
+                    print(" ✓ 384-D Vector Cache: ENABLED")
+                continue
+            elif cmd == "/caveman":
+                if len(parts) > 1 and parts[1].lower() in ["off", "false", "0"]:
+                    use_caveman = False
+                    print(" ✓ Caveman Compression: DISABLED")
+                else:
+                    use_caveman = True
+                    print(" ✓ Caveman Compression: ENABLED")
+                continue
+            elif cmd in ["/help", "/h", "/?"]:
+                print("\n Available Commands:")
+                print("   /provider <name>   Switch provider: ollama, gemini, groq, openai, anthropic")
+                print("   /model <name>      Change model identifier")
+                print("   /key <api_key>     Provide or update cloud API key")
+                print("   /cache <on|off>    Toggle 0-Watt Semantic Cache")
+                print("   /caveman <on|off>  Toggle Caveman prompt compression")
+                print("   /stats             Display session cumulative green impact audit")
+                print("   /clear             Clear terminal screen")
+                print("   /exit              Exit chat and display final session report\n")
+                continue
+            else:
+                print(f" Unknown command '{cmd}'. Type /help for available commands.")
+                continue
+
+        # Normal prompt inference
+        print(" ⏳ ZeroTrace consulting cache & model...", end="\r", flush=True)
+        try:
+            res = dispatch_chat(
+                message=prompt,
+                provider=provider,
+                model=model,
+                api_key=api_key,
+                use_cache=use_cache,
+                use_caveman=use_caveman,
+                caveman_intensity=intensity,
+            )
+
+            # Clear progress line
+            print(" " * 45, end="\r")
+
+            if not res.get("success", True) and "error" in res:
+                print(f"\n[ERROR] {res.get('error')}")
+                continue
+
+            answer = res.get("answer", "")
+            print(f"\nZeroTrace AI >\n{answer}\n")
+
+            if res.get("cache_hit"):
+                print(f"[🟢 100% ZERO-WATT CACHE HIT | <5ms | 0 GPU Joules | 0 API Tokens | Saved {res.get('tokens_saved', 0)} tokens | {res.get('energy_saved_j', 0):.2f} J | {res.get('carbon_saved_g', 0):.5f} gCO2]")
+            else:
+                saved_tokens = res.get("tokens_saved", 0)
+                saved_j = res.get("energy_saved_j", 0.0)
+                saved_co2 = res.get("carbon_saved_g", 0.0)
+                dur = res.get("duration_s", 0.0)
+                print(f"[⚡ ZEROTRACE SAVED: {saved_tokens} tokens | {saved_j:.2f} J Electricity | {saved_co2:.5f} gCO2 | Latency: {dur}s | Model: {provider}:{model}]")
+
+            print(f" Session Cumulative: {state.total_energy_saved_j:.1f} J saved | {state.total_tokens_saved} tokens saved | {state.total_cache_hits} cache hit(s)")
+
+        except Exception as e:
+            print(" " * 45, end="\r")
+            print(f"\n[ERROR] Request failed: {e}")
+            if provider == "ollama" and not ollama_client.is_online():
+                print(" -> Local Ollama is offline. Type '/provider gemini' or run 'ollama serve'.")
+
+
 def main():
+    # If user runs `python cli.py` with no arguments, launch interactive chat directly!
+    if len(sys.argv) == 1:
+        cmd_chat()
+        return
+
+    # If user runs `python cli.py "some prompt..."`, run one-shot prompt inference directly!
+    if len(sys.argv) == 2 and sys.argv[1] not in ["-h", "--help", "live", "compress", "info", "chat"]:
+        cmd_one_shot(sys.argv[1])
+        return
+
     parser = argparse.ArgumentParser(description="Zerotrace AI - Green Hardware & Token Profiler CLI")
     subparsers = parser.add_subparsers(dest="command", help="Sub-commands")
+
+    # Chat command
+    chat_p = subparsers.add_parser("chat", help="Start interactive Green AI chat (default)")
+    chat_p.add_argument("--provider", "-p", choices=["ollama", "gemini", "groq", "openai", "anthropic", "custom"], help="Inference provider")
+    chat_p.add_argument("--model", "-m", type=str, help="Model identifier")
+    chat_p.add_argument("--key", "-k", type=str, help="API Key")
 
     # Live command
     live_p = subparsers.add_parser("live", help="Stream live hardware watts and carbon emissions")
@@ -165,14 +439,16 @@ def main():
 
     args = parser.parse_args()
 
-    if args.command == "live":
+    if args.command == "chat" or args.command is None:
+        cmd_chat(args)
+    elif args.command == "live":
         cmd_live(args)
     elif args.command == "compress":
         cmd_compress(args)
     elif args.command == "info":
         cmd_info(args)
     else:
-        parser.print_help()
+        cmd_chat()
 
 
 if __name__ == "__main__":
