@@ -128,7 +128,7 @@ def main():
     live_p.add_argument("--interval", type=float, default=1.0, help="Sampling interval in seconds (default: 1.0)")
 
     # Compress command
-    comp_p = subparsers.add_parser("compress", help="Compress prompt with Caveman (~65% token drop)")
+    comp_p = subparsers.add_parser("compress", help="Compress prompt with Caveman (~65%% token drop)")
     comp_p.add_argument("text", nargs="?", default="", help="Text to compress")
     comp_p.add_argument("--file", "-f", type=str, default="", help="Read input from text file")
     comp_p.add_argument("--intensity", "-i", choices=["lite", "full", "ultra"], default="full", help="Compression level")

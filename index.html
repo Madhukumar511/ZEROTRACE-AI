@@ -956,6 +956,97 @@ footer { text-align:center; padding:2.5rem 2rem; border-top:1px solid rgba(255,2
   </div>
 </section>
 
+<!-- ── ⑤ Green Inference Gateway & Live Chat ────────────────────── -->
+<section id="chat-sec" style="margin-top:2.5rem;">
+  <div class="section-tag">05 — GREEN INFERENCE GATEWAY &amp; LIVE CHAT</div>
+  <h2 class="sec">Live Multi-Model Chat — Local &amp; Cloud with Zero-Watt Cache</h2>
+  <div style="color:var(--txt-dim);font-size:.85rem;margin-bottom:1.5rem;line-height:1.6;">
+    Chat directly with local models (<span style="color:var(--teal-l)">Ollama</span>) or frontier cloud models (<span style="color:var(--gold-l)">Google Gemini, Groq, OpenAI, Anthropic Claude</span>).
+    Every message is checked against our <strong style="color:var(--teal-l);">384-D Semantic Vector Cache</strong> (returns in &lt;5ms at 0 Watts on match)
+    and compressed via <strong style="color:var(--gold-l);">Caveman syntax</strong> (~65% token reduction on novel queries).
+  </div>
+
+  <div class="card card-pad" style="padding:1.5rem;">
+    <!-- Top Configuration Bar -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:1rem;margin-bottom:1.2rem;background:rgba(0,0,0,0.3);padding:1.2rem;border-radius:8px;border:1px solid rgba(255,255,255,0.06);">
+      <div>
+        <label class="form-lbl">Model Provider</label>
+        <select id="chat-provider" onchange="onChatProviderChange()" style="width:100%;padding:.45rem;background:var(--bg-panel);border:1px solid rgba(255,255,255,0.15);border-radius:6px;color:#fff;font-family:var(--mono);font-size:.82rem;">
+          <option value="gemini" selected>🌐 Google Gemini (Flash / Pro)</option>
+          <option value="groq">⚡ Groq (Ultra-Fast LPU)</option>
+          <option value="openai">🤖 OpenAI (GPT-4o / Mini)</option>
+          <option value="anthropic">🧠 Anthropic Claude (Sonnet / Haiku)</option>
+          <option value="ollama">💻 Local Ollama (Offline)</option>
+          <option value="custom">🔌 Custom OpenAI Endpoint</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="form-lbl">Model Identifier</label>
+        <select id="chat-model" style="width:100%;padding:.45rem;background:var(--bg-panel);border:1px solid rgba(255,255,255,0.15);border-radius:6px;color:#fff;font-family:var(--mono);font-size:.82rem;">
+          <option value="gemini-1.5-flash">gemini-1.5-flash (Fast &amp; Green)</option>
+          <option value="gemini-1.5-pro">gemini-1.5-pro</option>
+          <option value="gemini-2.0-flash-exp">gemini-2.0-flash-exp</option>
+        </select>
+      </div>
+
+      <div id="chat-key-container">
+        <label class="form-lbl">API Key <span style="font-size:.65rem;color:var(--txt-dim);">(Saved in Browser LocalStorage)</span></label>
+        <input type="password" id="chat-api-key" placeholder="Paste API Key (or set in .env)..." onchange="saveChatKey()" style="width:100%;padding:.45rem;background:var(--bg-panel);border:1px solid rgba(255,255,255,0.15);border-radius:6px;color:#fff;font-family:var(--mono);font-size:.82rem;">
+      </div>
+
+      <div style="display:flex;align-items:center;gap:1.2rem;flex-wrap:wrap;padding-top:.8rem;">
+        <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer;font-size:.8rem;color:var(--teal-l);">
+          <input type="checkbox" id="chat-use-cache" checked>
+          <span>⚡ Vector Cache (0W)</span>
+        </label>
+        <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer;font-size:.8rem;color:var(--gold-l);">
+          <input type="checkbox" id="chat-use-caveman" checked>
+          <span>🪨 Caveman (~65%)</span>
+        </label>
+        <select id="chat-caveman-intensity" style="padding:.2rem .4rem;font-size:.75rem;background:var(--bg-panel);border:1px solid rgba(255,255,255,0.1);color:#fff;border-radius:4px;">
+          <option value="lite">Lite</option>
+          <option value="full" selected>Full</option>
+          <option value="ultra">Ultra</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Quick Seed Prompts -->
+    <div style="display:flex;gap:.5rem;align-items:center;margin-bottom:1rem;flex-wrap:wrap;">
+      <span style="font-size:.7rem;color:var(--txt-dim);text-transform:uppercase;letter-spacing:1px;font-family:var(--mono);">Demos:</span>
+      <button class="btn btn-ghost" onclick="sendQuickPrompt('what is zerotrace ai')" style="padding:.25rem .6rem;font-size:.72rem;">🟢 ZeroTrace AI (Cache Hit Demo)</button>
+      <button class="btn btn-ghost" onclick="sendQuickPrompt('how to save energy with llms')" style="padding:.25rem .6rem;font-size:.72rem;">🟢 Save Energy with LLMs (Cache Hit Demo)</button>
+      <button class="btn btn-ghost" onclick="sendQuickPrompt('how to reverse a string in python')" style="padding:.25rem .6rem;font-size:.72rem;">🟢 Reverse Python String (Cache Hit Demo)</button>
+      <button class="btn btn-ghost" onclick="sendQuickPrompt('write a python script to check if a website is online')" style="padding:.25rem .6rem;font-size:.72rem;">⚡ Website Pinger</button>
+      <button class="btn btn-ghost" onclick="sendQuickPrompt('explain how transformers work in detail please')" style="padding:.25rem .6rem;font-size:.72rem;">⚡ Transformers Deep-Dive</button>
+    </div>
+
+    <!-- Live Chat Messages Log -->
+    <div id="chat-messages" style="height:380px;overflow-y:auto;background:rgba(0,0,0,0.5);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:1rem;display:flex;flex-direction:column;gap:1rem;scroll-behavior:smooth;">
+      <!-- Welcome Message -->
+      <div style="background:rgba(90,173,157,0.08);border:1px solid rgba(90,173,157,0.25);border-radius:8px;padding:.8rem 1rem;max-width:85%;">
+        <div style="font-weight:700;color:var(--teal-l);font-size:.85rem;margin-bottom:.3rem;display:flex;align-items:center;gap:.5rem;">
+          <span>🌱 ZeroTrace AI Green Gateway</span>
+          <span style="font-size:.65rem;background:rgba(90,173,157,0.2);color:var(--teal-l);padding:2px 6px;border-radius:4px;">ACTIVE</span>
+        </div>
+        <div style="font-size:.82rem;color:var(--txt-dim);line-height:1.5;">
+          Welcome! Ask any question to see ZeroTrace in action. If you ask a cached query, you get an instant <strong>0-Watt response in &lt;5 milliseconds</strong>. For novel questions, Caveman compresses the prompt before dispatching to your selected local or cloud model!
+        </div>
+      </div>
+    </div>
+
+    <!-- Input Box & Action Bar -->
+    <div style="display:flex;gap:.8rem;margin-top:1rem;">
+      <textarea id="chat-input" rows="2" placeholder="Type your question or code request here... (Press Enter to send, Shift+Enter for newline)" style="flex:1;background:rgba(0,0,0,0.5);border:1px solid rgba(255,255,255,0.15);border-radius:8px;padding:.8rem;color:#fff;font-family:inherit;font-size:.88rem;resize:none;outline:none;" onkeydown="handleChatKeyDown(event)"></textarea>
+      <button id="chat-send-btn" class="btn btn-teal" onclick="sendChatMessage()" style="padding:0 1.8rem;display:flex;align-items:center;justify-content:center;gap:.5rem;font-size:.9rem;">
+        <span>SEND</span>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+      </button>
+    </div>
+  </div>
+</section>
+
 </main>
 
 <footer>
@@ -990,6 +1081,7 @@ function scrollTo(id) { document.getElementById(id).scrollIntoView({behavior:'sm
 window.addEventListener('DOMContentLoaded', async () => {
   initCharts();
   init3D();
+  initChatGateway();
   await checkHealth();
   startSSE();
 });
@@ -1631,6 +1723,229 @@ function init3D(){
     lt+=.01; pl.position.x=Math.sin(lt)*6; pl.position.z=Math.cos(lt)*6;
     ctrl.update(); rend.render(sc,cam);
   })();
+}
+
+// ── Green Chat & Inference Gateway ────────────────────
+let chatProvidersData = null;
+
+const CLOUD_MODEL_OPTIONS = {
+  gemini: [
+    { val: 'gemini-1.5-flash', label: 'gemini-1.5-flash (Fast & Green)' },
+    { val: 'gemini-1.5-pro', label: 'gemini-1.5-pro (Deep Reasoning)' },
+    { val: 'gemini-2.0-flash-exp', label: 'gemini-2.0-flash-exp (Frontier)' },
+  ],
+  groq: [
+    { val: 'llama-3.3-70b-versatile', label: 'llama-3.3-70b-versatile (Ultra-Fast LPU)' },
+    { val: 'llama-3.1-8b-instant', label: 'llama-3.1-8b-instant (Low Latency)' },
+    { val: 'mixtral-8x7b-32768', label: 'mixtral-8x7b-32768' },
+  ],
+  openai: [
+    { val: 'gpt-4o-mini', label: 'gpt-4o-mini (Fast & Cheap)' },
+    { val: 'gpt-4o', label: 'gpt-4o (Frontier Model)' },
+    { val: 'gpt-3.5-turbo', label: 'gpt-3.5-turbo' },
+  ],
+  anthropic: [
+    { val: 'claude-3-5-sonnet-20241022', label: 'claude-3-5-sonnet (High Intelligence)' },
+    { val: 'claude-3-haiku-20240307', label: 'claude-3-haiku (Fast & Light)' },
+  ],
+  custom: [
+    { val: 'default', label: 'Default Custom Model' }
+  ]
+};
+
+async function initChatGateway() {
+  try {
+    const res = await fetch(`${API}/api/chat/providers`);
+    if (res.ok) {
+      chatProvidersData = await res.json();
+    }
+  } catch (e) {
+    console.warn('Could not fetch chat providers:', e);
+  }
+  onChatProviderChange();
+}
+
+function onChatProviderChange() {
+  const prov = document.getElementById('chat-provider').value;
+  const modelSelect = document.getElementById('chat-model');
+  const keyContainer = document.getElementById('chat-key-container');
+  const keyInput = document.getElementById('chat-api-key');
+
+  const savedKey = localStorage.getItem('zt_key_' + prov) || '';
+  keyInput.value = savedKey;
+
+  if (prov === 'ollama') {
+    keyContainer.style.display = 'none';
+  } else {
+    keyContainer.style.display = 'block';
+  }
+
+  modelSelect.innerHTML = '';
+  if (prov === 'ollama') {
+    if (chatProvidersData && chatProvidersData.local && chatProvidersData.local.models.length > 0) {
+      chatProvidersData.local.models.forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m;
+        opt.textContent = m;
+        modelSelect.appendChild(opt);
+      });
+    } else {
+      const opt = document.createElement('option');
+      opt.value = 'llama3:latest';
+      opt.textContent = 'llama3:latest (Default)';
+      modelSelect.appendChild(opt);
+    }
+  } else if (CLOUD_MODEL_OPTIONS[prov]) {
+    CLOUD_MODEL_OPTIONS[prov].forEach(item => {
+      const opt = document.createElement('option');
+      opt.value = item.val;
+      opt.textContent = item.label;
+      modelSelect.appendChild(opt);
+    });
+  }
+}
+
+function saveChatKey() {
+  const prov = document.getElementById('chat-provider').value;
+  const key = document.getElementById('chat-api-key').value.trim();
+  if (key) {
+    localStorage.setItem('zt_key_' + prov, key);
+    toast(`${prov.toUpperCase()} API Key saved in browser!`);
+  }
+}
+
+function sendQuickPrompt(txt) {
+  document.getElementById('chat-input').value = txt;
+  sendChatMessage();
+}
+
+function handleChatKeyDown(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendChatMessage();
+  }
+}
+
+function escapeHtml(str) {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function formatChatAnswer(text) {
+  if (!text) return '';
+  let formatted = escapeHtml(text);
+  formatted = formatted.replace(/```([a-zA-Z0-9]*)\n([\s\S]*?)```/g, (match, lang, code) => {
+    return `<pre style="background:rgba(0,0,0,0.6);border:1px solid rgba(90,173,157,0.3);border-radius:6px;padding:0.8rem;overflow-x:auto;margin:0.5rem 0;font-family:var(--mono);font-size:0.82rem;color:var(--teal-l);"><code>${code}</code></pre>`;
+  });
+  formatted = formatted.replace(/`([^`]+)`/g, '<code style="background:rgba(255,255,255,0.1);padding:2px 5px;border-radius:4px;font-family:var(--mono);color:var(--teal-l);">$1</code>');
+  formatted = formatted.replace(/\n/g, '<br>');
+  return formatted;
+}
+
+async function sendChatMessage() {
+  const inputEl = document.getElementById('chat-input');
+  const msg = inputEl.value.trim();
+  if (!msg) return;
+
+  const provider = document.getElementById('chat-provider').value;
+  const model = document.getElementById('chat-model').value;
+  const apiKey = document.getElementById('chat-api-key').value.trim();
+  const useCache = document.getElementById('chat-use-cache').checked;
+  const useCaveman = document.getElementById('chat-use-caveman').checked;
+  const cavemanIntensity = document.getElementById('chat-caveman-intensity').value;
+
+  const messagesContainer = document.getElementById('chat-messages');
+
+  const userDiv = document.createElement('div');
+  userDiv.style.cssText = 'align-self:flex-end;background:rgba(212,168,50,0.12);border:1px solid rgba(212,168,50,0.3);border-radius:8px;padding:.8rem 1rem;max-width:85%;';
+  userDiv.innerHTML = `<div style="font-weight:700;color:var(--gold-l);font-size:.82rem;margin-bottom:.2rem;">You</div><div style="font-size:.86rem;color:#fff;line-height:1.4;">${escapeHtml(msg)}</div>`;
+  messagesContainer.appendChild(userDiv);
+  inputEl.value = '';
+
+  const loadingDiv = document.createElement('div');
+  loadingDiv.id = 'chat-loading-bubble';
+  loadingDiv.style.cssText = 'align-self:flex-start;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:.8rem 1rem;max-width:85%;';
+  loadingDiv.innerHTML = `<div style="display:flex;align-items:center;gap:.6rem;font-size:.82rem;color:var(--txt-dim);"><div class="blink-dot"></div><span>Consulting ZeroTrace Vector Cache &amp; ${provider.toUpperCase()}...</span></div>`;
+  messagesContainer.appendChild(loadingDiv);
+  messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+  const sendBtn = document.getElementById('chat-send-btn');
+  sendBtn.disabled = true;
+
+  try {
+    const res = await fetch(`${API}/api/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message: msg,
+        provider: provider,
+        model: model,
+        api_key: apiKey || null,
+        use_cache: useCache,
+        use_caveman: useCaveman,
+        caveman_intensity: cavemanIntensity,
+      }),
+    });
+
+    const data = await res.json();
+    loadingDiv.remove();
+
+    if (!res.ok || !data.success) {
+      const errDiv = document.createElement('div');
+      errDiv.style.cssText = 'align-self:flex-start;background:rgba(201,58,0,0.15);border:1px solid var(--rust);border-radius:8px;padding:.8rem 1rem;max-width:85%;color:#fff;font-size:.85rem;';
+      errDiv.innerHTML = `<strong>Error:</strong> ${data.detail || data.error || 'Failed to get response'}`;
+      messagesContainer.appendChild(errDiv);
+      return;
+    }
+
+    const botDiv = document.createElement('div');
+    botDiv.style.cssText = 'align-self:flex-start;background:rgba(90,173,157,0.08);border:1px solid rgba(90,173,157,0.25);border-radius:8px;padding:.8rem 1rem;max-width:85%;';
+
+    let badgeHtml = '';
+    if (data.cache_hit) {
+      badgeHtml = `
+        <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem;flex-wrap:wrap;">
+          <span style="background:rgba(90,173,157,0.25);color:var(--teal-l);font-family:var(--mono);font-size:.7rem;padding:3px 8px;border-radius:4px;font-weight:700;border:1px solid var(--teal-l);">
+            🟢 100% ZERO-WATT CACHE HIT
+          </span>
+          <span style="font-family:var(--mono);font-size:.7rem;color:var(--txt-dim);">
+            Match: ${(data.similarity_score * 100).toFixed(1)}% &middot; 0 GPU Joules &middot; ${data.duration_ms}ms
+          </span>
+        </div>`;
+    } else {
+      badgeHtml = `
+        <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem;flex-wrap:wrap;">
+          <span style="background:rgba(212,168,50,0.2);color:var(--gold-l);font-family:var(--mono);font-size:.7rem;padding:3px 8px;border-radius:4px;font-weight:700;border:1px solid var(--gold-l);">
+            ⚡ ${data.provider.toUpperCase()} (${data.model})
+          </span>
+          <span style="font-family:var(--mono);font-size:.7rem;color:var(--txt-dim);">
+            Saved ${data.tokens_saved} tokens &middot; -${data.energy_saved_j} J &middot; ${data.duration_s}s
+          </span>
+        </div>`;
+    }
+
+    botDiv.innerHTML = `
+      ${badgeHtml}
+      <div style="font-size:.86rem;color:#e8f0eb;line-height:1.6;">
+        ${formatChatAnswer(data.answer)}
+      </div>`;
+    messagesContainer.appendChild(botDiv);
+
+    if (data.cache_hit) {
+      toast('⚡ Instant Zero-Watt Cache Hit! (0 Joules burned)');
+    } else if (data.tokens_saved > 0) {
+      toast(`Caveman saved ${data.tokens_saved} prompt tokens!`);
+    }
+
+  } catch (err) {
+    loadingDiv.remove();
+    const errDiv = document.createElement('div');
+    errDiv.style.cssText = 'align-self:flex-start;background:rgba(201,58,0,0.15);border:1px solid var(--rust);border-radius:8px;padding:.8rem 1rem;max-width:85%;color:#fff;font-size:.85rem;';
+    errDiv.innerHTML = `<strong>Network Error:</strong> ${err.message}`;
+    messagesContainer.appendChild(errDiv);
+  } finally {
+    sendBtn.disabled = false;
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+  }
 }
 </script>
 </body>

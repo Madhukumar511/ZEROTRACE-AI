@@ -31,6 +31,14 @@ class StateManager:
         self.total_tokens_saved: int = 0
         self.total_energy_saved_j: float = 0.0
 
+        # Semantic Vector Cache & kNN Gating State
+        from zerotrace.core.vector_datastore import VectorDatastore
+        from zerotrace.core.knn_combiner import KNNCombiner
+        self.vector_cache = VectorDatastore(dimension=384)
+        self.knn_combiner = KNNCombiner(cache_threshold=0.88)
+        self.total_cache_hits: int = 0
+        self._seed_default_cache()
+
         # Baseline Snapshot
         self.baseline_snapshot: Dict[str, Any] = {
             "power_w": None,
@@ -99,6 +107,35 @@ class StateManager:
             for k in self.baseline_snapshot:
                 self.baseline_snapshot[k] = None
             self.telemetry_history.clear()
+            self.total_cache_hits = 0
+
+    def _seed_default_cache(self):
+        """Pre-seeds common developer queries into the semantic vector cache."""
+        try:
+            from zerotrace.core.embedder import embedder
+            seeds = [
+                (
+                    "what is zerotrace ai",
+                    "ZeroTrace AI is a green AI efficiency platform that slashes GPU electricity (Joules), token waste, and carbon emissions using Semantic Vector Caching, Caveman prompt compression, and live hardware power telemetry.",
+                ),
+                (
+                    "how to save energy with llms",
+                    "To minimize LLM electrical consumption: 1) Cache frequent queries with 384-D vector matching (0W response); 2) Compress prompt filler with Caveman (~60% token cut); 3) Use 4-bit quantization (Q4_0); 4) Cap generation token limits.",
+                ),
+                (
+                    "how to reverse a string in python",
+                    "In Python, reverse a string using slice syntax:\n```python\ntext = 'hello'\nreversed_text = text[::-1]\nprint(reversed_text)  # 'olleh'\n```",
+                ),
+                (
+                    "what is caveman compression",
+                    "Caveman compression strips conversational filler, pleasantries, greetings, and articles into dense, direct technical syntax while preserving code blocks and technical identifiers verbatim. It achieves ~65% token reduction.",
+                ),
+            ]
+            for q, a in seeds:
+                vec = embedder.embed(q)
+                self.vector_cache.add(query=q, answer=a, vector=vec, metadata={"seed": True})
+        except Exception:
+            pass
 
 
 state = StateManager()
