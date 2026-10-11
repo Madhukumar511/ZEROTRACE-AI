@@ -31,6 +31,11 @@ def create_app() -> FastAPI:
     app.include_router(chat_router)
     app.include_router(v1_router)
 
+    @app.get("/api/autodiscover")
+    def autodiscover_endpoint():
+        from zerotrace.core.autodiscover import autodiscover
+        return autodiscover.auto_connect()
+
     return app
 
 

@@ -147,24 +147,11 @@ def cmd_info(args):
 
 
 def detect_default_provider():
-    """Detects best available inference provider: Local Ollama or configured Cloud LLMs."""
-    import os
-    if ollama_client.is_online():
-        models = ollama_client.list_models()
-        model_name = models[0]["name"] if models else "llama3:latest"
-        return "ollama", model_name
-
-    # Check Cloud API Keys in environment (.env)
-    if os.environ.get("GEMINI_API_KEY"):
-        return "gemini", "gemini-1.5-flash"
-    if os.environ.get("GROQ_API_KEY"):
-        return "groq", "llama-3.3-70b-versatile"
-    if os.environ.get("OPENAI_API_KEY"):
-        return "openai", "gpt-4o-mini"
-    if os.environ.get("ANTHROPIC_API_KEY"):
-        return "anthropic", "claude-3-5-sonnet-20241022"
-
-    return "ollama", "llama3:latest"
+    """Detects best available inference provider: Local Ollama, Offline weights, or configured Cloud LLMs."""
+    from zerotrace.core.autodiscover import autodiscover
+    report = autodiscover.auto_connect()
+    auto = report["auto_connected"]
+    return auto["provider"], auto["model"], report
 
 
 def dispatch_chat(
@@ -228,7 +215,7 @@ def print_session_audit():
 
 def cmd_one_shot(prompt: str, provider: str = None, model: str = None):
     """Executes a single prompt through ZeroTrace and outputs response with green metrics."""
-    def_prov, def_model = detect_default_provider()
+    def_prov, def_model, _ = detect_default_provider()
     provider = provider or def_prov
     model = model or def_model
 
@@ -255,7 +242,7 @@ def cmd_chat(args=None):
     and compressed with Caveman (~65% token drop), with live energy & carbon tracking.
     """
     import os
-    default_provider, default_model = detect_default_provider()
+    default_provider, default_model, disco_report = detect_default_provider()
     provider = getattr(args, "provider", None) or default_provider
     model = getattr(args, "model", None) or default_model
     intensity = "full"
@@ -263,10 +250,17 @@ def cmd_chat(args=None):
     use_caveman = True
     api_key = getattr(args, "key", None)
 
+    active_agent = disco_report["auto_connected"]["active_agent"]
+    hw_source = disco_report["hardware"]["telemetry_source"]
+    offline_status = f"{len(disco_report['offline_models'])} Offline Models Ready" if disco_report['offline_models'] else "Cloud Gateway Ready"
+
     print("\n" + "=" * 78)
-    print(" ⚡ ZEROTRACE AI — INTERACTIVE GREEN CHAT GATEWAY")
+    print(" ⚡ ZEROTRACE AI — UNIVERSAL GREEN CHAT GATEWAY")
     print("=" * 78)
-    print(f" Active Provider: {provider.upper()} ({model}) | Grid Carbon: {get_carbon():.1f} gCO2/kWh")
+    print(f" Agent Link:      {active_agent}")
+    print(f" Offline Models:  {offline_status}")
+    print(f" Active Target:   {provider.upper()} ({model})")
+    print(f" Telemetry Source:{hw_source} | Grid Carbon: {get_carbon():.1f} gCO2/kWh")
     print(" ZeroTrace runs transparently in the background while you chat:")
     print("   • 384-D Semantic Vector Cache  -> 0-Watt instant recall on repeated queries")
     print("   • Caveman Prompt Compression   -> ~65% token drop on novel queries")

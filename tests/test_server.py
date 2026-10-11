@@ -117,3 +117,14 @@ def test_optimization_techniques():
     cpu_lean = apply_gpu_routing(base_opts, mode="cpu_lean")
     assert cpu_lean["num_gpu"] == 0
     assert cpu_lean["num_thread"] == 4
+
+
+def test_autodiscover_endpoint():
+    """Verify system autodiscovery detects offline models and agents."""
+    response = client.get("/api/autodiscover")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["success"] is True
+    assert "auto_connected" in data
+    assert "hardware" in data
+    assert "agents" in data

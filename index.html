@@ -7,7 +7,7 @@
   <meta name="description" content="Real Ollama telemetry — live CPU/GPU before vs after optimization.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,600;1,400&family=Space+Grotesk:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
@@ -15,16 +15,19 @@
 <style>
 /* ── Root tokens ──────────────────────────────────────────── */
 :root {
-  --teal:   #3c7f72; --teal-l:  #5aad9d; --teal-glow: rgba(90,173,157,0.30);
-  --gold:   #ab8115; --gold-l:  #d4a832; --gold-glow:  rgba(212,168,50,0.30);
-  --rust:   #992800; --rust-l:  #c93a00; --rust-glow:  rgba(201,58,0,0.30);
-  --purple: #9b59b6; --purple-l:#b07dd4; --purple-glow:rgba(176,125,212,0.30);
-  --green:  #27ae60; --green-l: #2ecc71; --green-glow: rgba(46,204,113,0.30);
-  --bg:     #050807; --bg-card: rgba(11,18,14,0.85); --bg-panel:#090e0b;
-  --txt:    #f0f5f3; --txt-dim: #7a9e97; --border: rgba(60,127,114,0.20);
+  --teal:   #059669; --teal-l:  #10b981; --teal-glow: rgba(16,185,129,0.28);
+  --emerald:#059669; --emerald-l:#10b981; --emerald-glow: rgba(16,185,129,0.30);
+  --gold:   #d97706; --gold-l:  #f59e0b; --gold-glow:  rgba(245,158,11,0.28);
+  --rust:   #dc2626; --rust-l:  #ef4444; --rust-glow:  rgba(239,68,68,0.28);
+  --purple: #7c3aed; --purple-l:#a855f7; --purple-glow:rgba(168,85,247,0.28);
+  --green:  #059669; --green-l: #10b981; --green-glow: rgba(16,185,129,0.30);
+  --cyan:   #0891b2; --cyan-l:  #06b6d4; --cyan-glow:  rgba(6,182,212,0.28);
+  --bg:     #060a08; --bg-card: rgba(12,19,15,0.82); --bg-panel:#09100c;
+  --txt:    #f8fafc; --txt-dim: #94a3b8; --border: rgba(52,211,153,0.18);
+  --border-focus: rgba(52,211,153,0.45);
   --r:      12px;
-  --font:   'Space Grotesk', sans-serif;
-  --mono:   'IBM Plex Mono', monospace;
+  --font:   'Space Grotesk', -apple-system, sans-serif;
+  --mono:   'JetBrains Mono', 'IBM Plex Mono', monospace;
 }
 *,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
 html { scroll-behavior:smooth; }
@@ -81,22 +84,56 @@ header {
 /* ── Connected model pill (header) ──────────────────────── */
 #model-pill {
   display:none; align-items:center; gap:8px;
-  background:rgba(46,204,113,0.10); border:1px solid rgba(46,204,113,0.25);
+  background:rgba(16,185,129,0.12); border:1px solid rgba(16,185,129,0.3);
   border-radius:20px; padding:5px 14px;
-  font-size:.78rem; font-weight:700; color:var(--green-l);
+  font-size:.78rem; font-weight:700; color:var(--emerald-l);
   letter-spacing:1px; animation:none;
 }
 #model-pill.visible { display:flex; }
 #model-pill .live-ring {
   width:8px; height:8px; border-radius:50%;
-  background:var(--green-l);
-  box-shadow:0 0 0 0 rgba(46,204,113,0.6);
+  background:var(--emerald-l);
+  box-shadow:0 0 0 0 rgba(16,185,129,0.6);
   animation:livePing 1.4s ease-out infinite;
 }
+
+/* ── Auto-discovery Pill (header) ────────────────────────── */
+#autodiscover-pill {
+  display:flex; align-items:center; gap:8px;
+  background:rgba(16,185,129,0.08); border:1px solid rgba(16,185,129,0.25);
+  border-radius:20px; padding:5px 14px;
+  font-size:.72rem; font-weight:600; color:var(--emerald-l);
+  font-family:var(--mono); letter-spacing:.5px;
+}
+#autodiscover-pill .live-ring {
+  width:7px; height:7px; border-radius:50%;
+  background:var(--emerald-l);
+  box-shadow:0 0 0 0 rgba(16,185,129,0.6);
+  animation:livePing 1.4s ease-out infinite;
+}
+
+/* ── Environment Radar Badges (Hero) ─────────────────────── */
+.hero-radar-strip {
+  display:flex; gap:.8rem; justify-content:center; flex-wrap:wrap;
+  margin-top:1.5rem; margin-bottom:1.5rem;
+}
+.radar-pill {
+  display:inline-flex; align-items:center; gap:8px;
+  background:rgba(12,19,15,0.7); border:1px solid rgba(52,211,153,0.18);
+  border-radius:24px; padding:6px 14px;
+  font-family:var(--mono); font-size:.72rem; color:var(--txt-dim);
+  backdrop-filter:blur(10px); transition:border-color .3s, color .3s;
+}
+.radar-pill.active {
+  color:var(--emerald-l); border-color:rgba(16,185,129,0.35);
+  background:rgba(16,185,129,0.06);
+}
+.radar-pill-dot { width:6px; height:6px; border-radius:50%; background:currentColor; }
+
 @keyframes livePing {
-  0%   { box-shadow:0 0 0 0 rgba(46,204,113,0.6); }
-  70%  { box-shadow:0 0 0 8px rgba(46,204,113,0); }
-  100% { box-shadow:0 0 0 0 rgba(46,204,113,0); }
+  0%   { box-shadow:0 0 0 0 rgba(16,185,129,0.6); }
+  70%  { box-shadow:0 0 0 8px rgba(16,185,129,0); }
+  100% { box-shadow:0 0 0 0 rgba(16,185,129,0); }
 }
 
 /* ── Hero ────────────────────────────────────────────────── */
@@ -428,6 +465,7 @@ footer { text-align:center; padding:2.5rem 2rem; border-top:1px solid rgba(255,2
   </div>
   <div class="header-center">
     <div id="api-status"><div class="blink-dot"></div><span id="status-text">CONNECTING…</span></div>
+    <div id="autodiscover-pill"><div class="live-ring"></div><span id="autodiscover-text">AUTO-CONNECTING…</span></div>
     <div id="model-pill"><div class="live-ring"></div><span id="pill-model-name">MODEL</span></div>
     
     <div id="global-radar">
@@ -455,6 +493,22 @@ footer { text-align:center; padding:2.5rem 2rem; border-top:1px solid rgba(255,2
       <button class="btn btn-teal" onclick="scrollTo('chat-sec')">💬 LIVE GREEN CHAT</button>
       <button class="btn btn-gold" onclick="scrollTo('connect-sec')">⚡ CONNECT MODEL</button>
       <button class="btn btn-ghost" onclick="scrollTo('compare-sec')">LIVE COMPARISON</button>
+    </div>
+
+    <!-- Real-Time Auto-Discovery HUD -->
+    <div class="hero-radar-strip" id="hero-radar-strip">
+      <div class="radar-pill active" id="rp-offline">
+        <span class="radar-pill-dot" style="background:var(--emerald-l);"></span>
+        <span id="rp-offline-txt">Offline Models: Detecting…</span>
+      </div>
+      <div class="radar-pill active" id="rp-agents">
+        <span class="radar-pill-dot" style="background:var(--cyan-l);"></span>
+        <span id="rp-agents-txt">Agent Link: Antigravity CLI (MCP Active)</span>
+      </div>
+      <div class="radar-pill active" id="rp-sensors">
+        <span class="radar-pill-dot" style="background:var(--amber-l);"></span>
+        <span id="rp-sensors-txt">Telemetry: Intel RAPL + NVML</span>
+      </div>
     </div>
 
     <!-- Live Power & Efficiency Grid directly in Hero -->
@@ -1223,8 +1277,54 @@ window.addEventListener('DOMContentLoaded', async () => {
   init3D();
   initChatGateway();
   await checkHealth();
+  await initAutoDiscovery();
   startSSE();
 });
+
+// ── Auto-Discovery & Zero-Config Connection ─────────────
+async function initAutoDiscovery() {
+  try {
+    const r = await fetch(`${API}/api/autodiscover`);
+    if (!r.ok) return;
+    const d = await r.json();
+    const auto = d.auto_connected;
+    
+    // Update Header HUD
+    const hud = document.getElementById('autodiscover-text');
+    if (hud && auto) {
+      hud.textContent = `AUTO: ${auto.active_agent.toUpperCase()} | ${auto.provider.toUpperCase()}:${auto.model}`;
+    }
+
+    // Update Hero Radar Strip
+    const rpOff = document.getElementById('rp-offline-txt');
+    if (rpOff) {
+      if (d.offline_models && d.offline_models.length > 0) {
+        rpOff.textContent = `Offline: ${d.offline_models.length} Ready (${d.offline_models[0].name})`;
+      } else {
+        rpOff.textContent = `Offline Models: Cloud Gateway fallback (${auto.provider})`;
+      }
+    }
+
+    const rpAg = document.getElementById('rp-agents-txt');
+    if (rpAg && auto) {
+      rpAg.textContent = `Agent Link: ${auto.active_agent}`;
+    }
+
+    const rpSensors = document.getElementById('rp-sensors-txt');
+    if (rpSensors && d.hardware) {
+      rpSensors.textContent = `Telemetry: ${d.hardware.telemetry_source}`;
+    }
+
+    // Auto-select chat provider & model if available
+    const provSelect = document.getElementById('chat-provider');
+    if (provSelect && auto && auto.provider) {
+      provSelect.value = auto.provider;
+      onChatProviderChange();
+    }
+  } catch(e) {
+    console.warn('Auto-discovery error:', e);
+  }
+}
 
 // ── Health ─────────────────────────────────────────────
 async function checkHealth() {

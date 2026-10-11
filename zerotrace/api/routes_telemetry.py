@@ -221,3 +221,10 @@ def record_external_savings(req: RecordSavingsRequest):
             "total_cache_hits": state.total_cache_hits,
         },
     }
+
+
+@router.get("/autodiscover")
+def get_autodiscover():
+    """Returns detected offline models, AI agents, and auto-connected hardware profile."""
+    from zerotrace.core.autodiscover import autodiscover
+    return autodiscover.auto_connect()

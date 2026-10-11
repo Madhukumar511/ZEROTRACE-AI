@@ -68,40 +68,43 @@ flowchart TD
 
 ## 💻 1-Click Quickstart for Laptops
 
-ZeroTrace AI is designed to run out of the box on any developer laptop with **zero manual setup**.
+ZeroTrace AI is designed to run out of the box on any developer laptop with **zero manual setup** across Windows, macOS, and Linux.
 
-### Linux & macOS (1-Click Run)
+### 🌐 Universal Command (Any OS, Any Terminal)
+Run directly with zero installation:
 ```bash
-git clone https://github.com/Madhukumar511/ZEROTRACE-AI.git
-cd ZEROTRACE-AI
+python -m zerotrace
+```
+Or install globally into your environment:
+```bash
+pip install -e .
+zerotrace
+```
 
+> **🔍 Instant Auto-Discovery Engine:**  
+> When launched, ZeroTrace automatically scans your machine and connects immediately:
+> - **Offline Models**: Detects local Ollama models (`llama3:latest`, `deepseek`, `mistral`) and offline weight files (`.gguf`, `.safetensors`, `.bin` in `./models`).
+> - **AI Developer Agents**: Detects Google Antigravity CLI (`agy` via MCP), Cursor, and Claude Code (via `/v1` proxy).
+> - **Hardware Sensors**: Detects Intel RAPL microsecond energy registers and NVIDIA NVML device milliwatts.
+
+---
+
+### 🚀 1-Click Launchers (Web Dashboard + Backend)
+
+#### Linux & macOS (1-Click Run)
+```bash
 ./run.sh
 ```
 *What `./run.sh` does automatically:*
 - Detects Python 3.9+ and creates an isolated virtual environment (`.venv`).
 - Installs all dependencies from `requirements.txt`.
-- Detects Intel RAPL or NVIDIA NVML hardware power counters (with safe fallbacks).
-- Launches the server and automatically opens **`http://localhost:8000`** in your default web browser!
+- Auto-discovers local models and hardware sensors.
+- Launches the server and automatically opens **`http://localhost:8000`** in your browser!
 
----
-
-### Windows (1-Click Run)
+#### Windows (1-Click Run)
 Double-click **`run.bat`** or run in CMD / PowerShell:
 ```cmd
-git clone https://github.com/Madhukumar511/ZEROTRACE-AI.git
-cd ZEROTRACE-AI
 run.bat
-```
-
----
-
-### Manual Setup (Optional)
-```bash
-python3 -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-
-python server.py
 ```
 
 ---
