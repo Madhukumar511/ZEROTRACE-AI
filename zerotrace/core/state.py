@@ -1,0 +1,104 @@
+import threading
+from collections import deque
+from typing import Optional, Dict, Any, List
+
+
+class StateManager:
+    """Thread-safe centralized state manager for Zerotrace AI."""
+
+    def __init__(self):
+        self._lock = threading.RLock()
+        self.phase: str = "idle"
+        self.inference_active: bool = False
+
+        # Ollama State
+        self.active_ollama_model: Optional[str] = None
+        self.ollama_options: Dict[str, Any] = {}
+        self.ollama_profile: str = "none"
+
+        # PyTorch State
+        self.pytorch_model = None
+        self.pytorch_tokenizer = None
+        self.pytorch_model_name: str = "None"
+
+        # Stress Test State
+        self.is_stress_testing: bool = False
+        self.stress_thread: Optional[threading.Thread] = None
+
+        # Caveman Token Optimization State
+        self.caveman_active: bool = False
+        self.caveman_intensity: str = "full"
+        self.total_tokens_saved: int = 0
+        self.total_energy_saved_j: float = 0.0
+
+        # Baseline Snapshot
+        self.baseline_snapshot: Dict[str, Any] = {
+            "power_w": None,
+            "tokens_per_sec": None,
+            "latency_ms": None,
+            "energy_j_per_tok": None,
+            "energy_j": None,
+            "tokens_generated": None,
+            "cpu_pct": None,
+            "gpu_util": None,
+            "gpu_power_w": None,
+            "model": None,
+            "measured_at": None,
+            "n_runs": None,
+            "benchmark_prompt": None,
+        }
+
+        # Telemetry Rolling History (300 seconds)
+        self.telemetry_history: deque = deque(maxlen=300)
+
+    def set_active_model(self, model_name: str):
+        with self._lock:
+            self.active_ollama_model = model_name
+            self.pytorch_model = None
+            self.pytorch_tokenizer = None
+            self.ollama_options = {}
+            self.ollama_profile = "none"
+            self.phase = "model_selected"
+            for k in self.baseline_snapshot:
+                self.baseline_snapshot[k] = None
+            self.baseline_snapshot["model"] = model_name
+
+    def update_baseline(self, baseline_metrics: Dict[str, Any]):
+        with self._lock:
+            self.baseline_snapshot.update(baseline_metrics)
+            self.phase = "benchmarked"
+
+    def reset_optimizations(self):
+        with self._lock:
+            self.ollama_options = {}
+            self.ollama_profile = "none"
+            self.caveman_active = False
+            if self.phase == "optimized":
+                self.phase = "benchmarked"
+
+    def record_telemetry(self, snapshot: Dict[str, Any]):
+        with self._lock:
+            self.telemetry_history.append(snapshot)
+
+    def reset_all(self):
+        with self._lock:
+            self.phase = "idle"
+            self.inference_active = False
+            self.active_ollama_model = None
+            self.ollama_options = {}
+            self.ollama_profile = "none"
+            self.pytorch_model = None
+            self.pytorch_tokenizer = None
+            self.pytorch_model_name = "None"
+            self.is_stress_testing = False
+            self.stress_thread = None
+            self.caveman_active = False
+            self.caveman_intensity = "full"
+            self.total_tokens_saved = 0
+            self.total_energy_saved_j = 0.0
+            for k in self.baseline_snapshot:
+                self.baseline_snapshot[k] = None
+            self.telemetry_history.clear()
+
+
+state = StateManager()

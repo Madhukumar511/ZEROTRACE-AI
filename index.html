@@ -683,7 +683,7 @@ footer { text-align:center; padding:2.5rem 2rem; border-top:1px solid rgba(255,2
 
 <section id="opt-sec">
   <div class="section-tag">03 — ENERGY OPTIMIZATIONS</div>
-  <h2 class="sec">4 Real Techniques — Each Measured Before &amp; After</h2>
+  <h2 class="sec">5 Real Techniques — Each Measured Before &amp; After</h2>
   <div id="opt-locked" class="banner warn" style="margin-bottom:1.2rem;">
     ⚠ Benchmark the model first to enable these controls.
   </div>
@@ -763,6 +763,80 @@ footer { text-align:center; padding:2.5rem 2rem; border-top:1px solid rgba(255,2
       <div class="opt-result-box cmd" id="res-quant_switch">Awaiting benchmark…</div>
     </div>
 
+    <div class="opt-card" id="oc-caveman" style="border:1px solid rgba(90,173,157,.4);background:rgba(90,173,157,.04);">
+      <div class="opt-row">
+        <div class="opt-icon" style="background:rgba(90,173,157,.2);border:1px solid rgba(90,173,157,.4);">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--teal-l)" stroke-width="2.5" stroke-linecap="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+        </div>
+        <div><div class="opt-title txt-teal">🪨 Caveman Compression</div><div class="opt-sub">~65% Token Drop · Slashing Electricity &amp; Carbon</div></div>
+      </div>
+      <div class="opt-desc">Prunes conversational fluff, pleasantries, hedging, and articles into dense smart-caveman syntax while strictly preserving code and technical terms. Bakes caveman system directive into model to cut generation tokens by ~65%, directly slashing GPU compute time, electricity (Joules), and carbon emissions.</div>
+      <div class="opt-ctrl">
+        <label class="form-lbl">Intensity Mode</label>
+        <select id="sel-caveman-intensity">
+          <option value="lite">Lite (~30% reduction, no filler)</option>
+          <option value="full" selected>Full (~65% reduction, classic caveman)</option>
+          <option value="ultra">Ultra (~75% reduction, telegraphic)</option>
+        </select>
+      </div>
+      <button class="btn btn-teal btn-full" id="btn-caveman" onclick="applyOpt('caveman')" disabled>APPLY CAVEMAN COMPRESSION (~65%)</button>
+      <div class="opt-result-box" id="res-caveman">Awaiting benchmark…</div>
+    </div>
+
+  </div>
+
+  <!-- Caveman Live Compression Playground -->
+  <div style="margin-top:1.5rem;background:linear-gradient(150deg,rgba(18,28,22,.95),rgba(8,13,10,.98));border:1px solid rgba(90,173,157,.3);border-radius:var(--r);padding:1.5rem;">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.8rem;margin-bottom:1rem;">
+      <div style="display:flex;align-items:center;gap:.6rem;">
+        <span style="font-size:1.3rem;">🪨</span>
+        <div>
+          <div style="font-weight:700;color:var(--teal-l);font-size:.95rem;">Caveman Prompt Compressor &amp; Green Energy Calculator</div>
+          <div style="font-size:.75rem;color:var(--txt-dim);">Test prompt token reduction &amp; compute exact Joules and gCO₂ saved before inference</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:.5rem;">
+        <label class="form-lbl" style="margin:0;">Mode:</label>
+        <select id="caveman-play-intensity" style="padding:.35rem .6rem;font-size:.75rem;">
+          <option value="lite">Lite (~30% reduction)</option>
+          <option value="full" selected>Full (~65% reduction)</option>
+          <option value="ultra">Ultra (~75% reduction)</option>
+        </select>
+        <button class="btn btn-teal" onclick="testCavemanLive()" style="padding:.4rem 1rem;font-size:.78rem;">⚡ COMPRESS &amp; CALCULATE</button>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+      <div>
+        <label class="form-lbl">Original Input Prompt</label>
+        <textarea id="caveman-play-input" rows="4" style="width:100%;background:rgba(0,0,0,.4);border:1px solid rgba(255,255,255,.1);border-radius:6px;color:#fff;font-family:var(--mono);font-size:.78rem;padding:.6rem;" placeholder="Type or paste prompt here...">Hello assistant! Could you please give a detailed explanation with at least 250 words on how transformer neural networks work? As an AI model, please cover the self-attention mechanism, the positional encoding, the feed-forward layers, and the training phase. Thank you so much, I look forward to your helpful answer!</textarea>
+      </div>
+      <div>
+        <label class="form-lbl">Caveman Compressed Prompt</label>
+        <textarea id="caveman-play-output" rows="4" readonly style="width:100%;background:rgba(0,0,0,.6);border:1px solid rgba(90,173,157,.2);border-radius:6px;color:var(--teal-l);font-family:var(--mono);font-size:.78rem;padding:.6rem;" placeholder="Compressed output will appear here..."></textarea>
+      </div>
+    </div>
+    <div id="caveman-play-metrics" style="display:none;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.8rem;margin-top:1rem;background:rgba(0,0,0,.3);border-radius:8px;padding:.8rem;">
+      <div style="text-align:center;">
+        <div style="font-size:.62rem;color:var(--txt-dim);text-transform:uppercase;">Tokens Before</div>
+        <div id="cm-tok-before" style="font-family:var(--mono);font-size:1.1rem;font-weight:700;color:var(--rust-l);">—</div>
+      </div>
+      <div style="text-align:center;">
+        <div style="font-size:.62rem;color:var(--txt-dim);text-transform:uppercase;">Tokens After</div>
+        <div id="cm-tok-after" style="font-family:var(--mono);font-size:1.1rem;font-weight:700;color:var(--teal-l);">—</div>
+      </div>
+      <div style="text-align:center;">
+        <div style="font-size:.62rem;color:var(--txt-dim);text-transform:uppercase;">Token Reduction</div>
+        <div id="cm-tok-sav" style="font-family:var(--mono);font-size:1.1rem;font-weight:700;color:var(--teal-l);">—</div>
+      </div>
+      <div style="text-align:center;">
+        <div style="font-size:.62rem;color:var(--txt-dim);text-transform:uppercase;">Electricity Saved</div>
+        <div id="cm-joules-sav" style="font-family:var(--mono);font-size:1.1rem;font-weight:700;color:var(--gold-l);">— J</div>
+      </div>
+      <div style="text-align:center;">
+        <div style="font-size:.62rem;color:var(--txt-dim);text-transform:uppercase;">Carbon Saved</div>
+        <div id="cm-co2-sav" style="font-family:var(--mono);font-size:1.1rem;font-weight:700;color:var(--teal-l);">— gCO₂</div>
+      </div>
+    </div>
   </div>
 
   <div style="display:flex;justify-content:space-between;align-items:center;margin-top:1.2rem;gap:1rem;flex-wrap:wrap;">
@@ -770,6 +844,7 @@ footer { text-align:center; padding:2.5rem 2rem; border-top:1px solid rgba(255,2
     <div style="font-size:.75rem;color:var(--txt-dim);font-family:var(--mono);">Each applied technique immediately fires a real inference call and reports measured before/after joules</div>
   </div>
 </section>
+
 
 <section id="monitor-sec">
   <div class="section-tag">04 — LIVE MONITOR</div>
@@ -1138,7 +1213,7 @@ function freezeBeforeColumn() {
 
 function baselineReady() {
   // Enable opt buttons
-  ['btn-tok','btn-ctx','btn-gpulean','btn-cpulean','btn-quant'].forEach(id=>{
+  ['btn-tok','btn-ctx','btn-gpulean','btn-cpulean','btn-quant','btn-caveman'].forEach(id=>{
     const el=document.getElementById(id); if(el) el.disabled=false;
   });
   document.getElementById('opt-locked').style.display = 'none';
@@ -1153,6 +1228,7 @@ async function applyOpt(strategy) {
   if (strategy==='token_limit')       payload.limit   = parseInt(document.getElementById('sl-tok').value);
   if (strategy==='context_reduction') payload.ctx     = parseInt(document.getElementById('sl-ctx').value);
   if (strategy==='quant_switch')      payload.variant = document.getElementById('sel-qv').value;
+  if (strategy==='caveman')          payload.intensity = document.getElementById('sel-caveman-intensity').value;
 
   const rKey = (strategy==='gpu_lean'||strategy==='cpu_lean') ? 'gpu_routing' : strategy;
   const resEl = document.getElementById(`res-${rKey}`);
@@ -1189,7 +1265,7 @@ async function applyOpt(strategy) {
     document.getElementById('live-profile-lbl').textContent = 'Profile: '+activeProfile;
 
     // Flash the card
-    const cardMap = {token_limit:'oc-token',context_reduction:'oc-ctx',gpu_lean:'oc-gpu',cpu_lean:'oc-gpu',quant_switch:'oc-quant'};
+    const cardMap = {token_limit:'oc-token',context_reduction:'oc-ctx',gpu_lean:'oc-gpu',cpu_lean:'oc-gpu',quant_switch:'oc-quant',caveman:'oc-caveman'};
     const card = document.getElementById(cardMap[strategy]);
     if(card){ card.classList.add('applied'); setTimeout(()=>card.classList.remove('applied'),700); }
 
@@ -1223,7 +1299,7 @@ async function resetOpt() {
   try {
     await fetch(`${API}/api/ollama/reset-optimization`,{method:'POST'});
     activeProfile='none';
-    ['res-token_limit','res-context_reduction','res-gpu_routing','res-quant_switch'].forEach(id=>{
+    ['res-token_limit','res-context_reduction','res-gpu_routing','res-quant_switch','res-caveman'].forEach(id=>{
       const e=document.getElementById(id);
       if(e){e.className='opt-result-box';e.textContent='Awaiting benchmark…';}
     });
@@ -1239,6 +1315,34 @@ async function resetOpt() {
     toast('Optimizations reset.');
   } catch(e){ toast('Reset failed','error'); }
 }
+
+// ── Live Caveman Playground ────────────────────────────
+async function testCavemanLive() {
+  const input = document.getElementById('caveman-play-input').value.trim();
+  const intensity = document.getElementById('caveman-play-intensity').value;
+  if (!input) { toast('Please enter a prompt to compress.','error'); return; }
+  try {
+    const r = await fetch(`${API}/api/compress`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ text: input, intensity })
+    });
+    const d = await r.json();
+    if (!d.success) throw new Error(d.detail || 'Compression failed');
+    document.getElementById('caveman-play-output').value = d.compressed_text;
+    const m = d.metrics;
+    document.getElementById('cm-tok-before').textContent = m.original_tokens;
+    document.getElementById('cm-tok-after').textContent = m.compressed_tokens;
+    document.getElementById('cm-tok-sav').textContent = `↓ ${m.saving_pct}% (-${m.tokens_saved})`;
+    document.getElementById('cm-joules-sav').textContent = `${m.energy_saved_j.toFixed(2)} J`;
+    document.getElementById('cm-co2-sav').textContent = `${(m.carbon_saved_g * 1000).toFixed(2)} mg`;
+    document.getElementById('caveman-play-metrics').style.display = 'grid';
+    toast(`Caveman reduced tokens by ${m.saving_pct}%!`);
+  } catch(e) {
+    toast('Compression error: ' + e.message, 'error');
+  }
+}
+
 
 // ── Stress test ────────────────────────────────────────
 async function startStress() {
