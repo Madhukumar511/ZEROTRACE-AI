@@ -5,6 +5,7 @@ import threading
 from datetime import datetime
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel, Field
 import psutil
 
 from zerotrace.core.state import state
@@ -171,3 +172,52 @@ def toggle_stress_test(payload: dict):
         return {"status": "stopped"}
 
     return {"status": "unchanged"}
+
+
+class RecordSavingsRequest(BaseModel):
+    tokens_saved: int = Field(0, description="Tokens saved by Caveman compression or caching")
+    energy_saved_j: float = Field(0.0, description="Electricity saved in Joules (optional, auto-estimated if 0)")
+    cache_hits: int = Field(0, description="Number of 0-Watt cache hits (optional)")
+    source: str = Field("antigravity", description="Client identifier (e.g. 'antigravity', 'cursor', 'claude_code')")
+    note: str = Field("", description="Optional note or query summary")
+
+
+@router.post("/record")
+def record_external_savings(req: RecordSavingsRequest):
+    """
+    Allows external AI assistants (Antigravity CLI, Cursor, Claude Code, Aider)
+    to dynamically log token and electrical energy savings into ZeroTrace's live telemetry dashboard.
+    """
+    carbon_kwh = get_carbon()
+    energy_added = req.energy_saved_j
+
+    if req.tokens_saved > 0:
+        state.total_tokens_saved += req.tokens_saved
+        # Physics model: ~0.08 Joules per LLM token on typical multi-socket / GPU cluster inference
+        if energy_added <= 0.0:
+            energy_added = round(req.tokens_saved * 0.08, 4)
+
+    if energy_added > 0:
+        state.total_energy_saved_j += energy_added
+
+    if req.cache_hits > 0:
+        state.total_cache_hits += req.cache_hits
+
+    co2_g = (state.total_energy_saved_j / 3_600_000.0) * carbon_kwh
+
+    return {
+        "success": True,
+        "recorded": {
+            "tokens_saved": req.tokens_saved,
+            "energy_saved_j": energy_added,
+            "cache_hits": req.cache_hits,
+            "source": req.source,
+        },
+        "cumulative": {
+            "total_tokens_saved": state.total_tokens_saved,
+            "total_energy_saved_j": round(state.total_energy_saved_j, 3),
+            "total_energy_saved_wh": round(state.total_energy_saved_j / 3600.0, 4),
+            "total_carbon_saved_g": round(co2_g, 6),
+            "total_cache_hits": state.total_cache_hits,
+        },
+    }

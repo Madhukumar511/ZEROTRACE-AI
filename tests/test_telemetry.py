@@ -51,3 +51,25 @@ def test_rapl_reader_safe_execution():
     # Will either return int or None without throwing exception
     rapl_val = read_rapl_energy_uj()
     assert rapl_val is None or isinstance(rapl_val, int)
+
+
+def test_record_external_savings_endpoint():
+    from server import app
+    from fastapi.testclient import TestClient
+    client = TestClient(app)
+
+    res = client.post("/api/telemetry/record", json={
+        "tokens_saved": 50,
+        "energy_saved_j": 4.0,
+        "cache_hits": 1,
+        "source": "test_agent",
+        "note": "pytest unit test"
+    })
+    assert res.status_code == 200
+    data = res.json()
+    assert data["success"] is True
+    assert data["recorded"]["tokens_saved"] == 50
+    assert data["recorded"]["energy_saved_j"] == 4.0
+    assert data["recorded"]["cache_hits"] == 1
+    assert data["cumulative"]["total_tokens_saved"] >= 50
+    assert data["cumulative"]["total_energy_saved_j"] >= 4.0
