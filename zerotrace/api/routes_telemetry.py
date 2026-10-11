@@ -8,6 +8,7 @@ from fastapi.responses import StreamingResponse
 import psutil
 
 from zerotrace.core.state import state
+from zerotrace.core.emissions import get_carbon
 from zerotrace.telemetry.process import get_isolated_ai_cpu
 from zerotrace.telemetry.hardware import get_gpu_telemetry, get_cpu_power_estimate
 from zerotrace.models.ollama import ollama_client
@@ -31,6 +32,7 @@ def live_telemetry():
 
     cpu_w = get_cpu_power_estimate(cpu_pct)
     total_w = round(cpu_w + gpu_w, 2)
+    carbon_kwh = get_carbon()
 
     snapshot = {
         "timestamp": datetime.now().isoformat(),
@@ -51,6 +53,12 @@ def live_telemetry():
         "phase": state.phase,
         "baseline_power_w": state.baseline_snapshot["power_w"],
         "caveman_active": state.caveman_active,
+        "total_energy_saved_j": round(state.total_energy_saved_j, 3),
+        "total_energy_saved_wh": round(state.total_energy_saved_j / 3600.0, 4),
+        "total_carbon_saved_g": round((state.total_energy_saved_j / 3_600_000.0) * carbon_kwh, 6),
+        "total_tokens_saved": state.total_tokens_saved,
+        "total_cache_hits": state.total_cache_hits,
+        "cache_size": state.vector_cache.size(),
     }
     state.record_telemetry(snapshot)
     return snapshot
@@ -77,6 +85,7 @@ async def metrics_stream():
             cpu_w = get_cpu_power_estimate(cpu_pct)
             total_w = round(cpu_w + gpu_w, 2)
             baseline_w = state.baseline_snapshot["power_w"]
+            carbon_kwh = get_carbon()
 
             frame = {
                 "cpu_pct": cpu_pct,
@@ -100,6 +109,12 @@ async def metrics_stream():
                     if baseline_w and baseline_w > 0 else None
                 ),
                 "caveman_active": state.caveman_active,
+                "total_energy_saved_j": round(state.total_energy_saved_j, 3),
+                "total_energy_saved_wh": round(state.total_energy_saved_j / 3600.0, 4),
+                "total_carbon_saved_g": round((state.total_energy_saved_j / 3_600_000.0) * carbon_kwh, 6),
+                "total_tokens_saved": state.total_tokens_saved,
+                "total_cache_hits": state.total_cache_hits,
+                "cache_size": state.vector_cache.size(),
             }
             yield f"data: {json.dumps(frame)}\n\n"
 

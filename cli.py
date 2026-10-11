@@ -17,39 +17,66 @@ from zerotrace.telemetry.zeus_monitor import ZEUS_OK
 from zerotrace.core.emissions import get_carbon
 from zerotrace.compression.caveman import CavemanCompressor
 from zerotrace.compression.prompt_optimizer import PromptOptimizer
+from zerotrace.core.state import state
 from zerotrace.models.ollama import ollama_client
 
 
 def cmd_live(args):
-    """Streams live hardware power, isolated AI CPU, and carbon telemetry to terminal."""
-    print("\n" + "=" * 65)
-    print(" ⚡ ZEROTRACE AI — LIVE HARDWARE TELEMETRY & GREEN AI MONITOR")
-    print("=" * 65)
+    """Streams live hardware power, isolated AI CPU, carbon telemetry, and cumulative green savings to terminal."""
+    print("\n" + "=" * 78)
+    print(" ⚡ ZEROTRACE AI — LIVE HARDWARE & GREEN SAVINGS MONITOR")
+    print("=" * 78)
     print(f" CPU Base TDP: {get_cpu_base_tdp()} W | NVML GPU: {'Enabled' if NVML_OK else 'Not Detected'} | Zeus: {'Active' if ZEUS_OK else 'Disabled'}")
     print(f" Carbon Intensity: {get_carbon():.1f} gCO2/kWh")
-    print("-" * 65)
-    print(f"{'TIME':<10} | {'CPU %':<8} | {'CPU (W)':<8} | {'GPU (W)':<8} | {'TOTAL (W)':<10} | {'CO2 (mg/s)':<10}")
-    print("-" * 65)
+    print("-" * 78)
+    print(f"{'TIME':<8} | {'CPU %':<7} | {'TOTAL W':<9} | {'CO2 (mg/s)':<11} | {'SAVED (J)':<11} | {'SAVED (gCO2)':<12} | {'CACHE HITS'}")
+    print("-" * 78)
 
     try:
         while True:
+            # Check if live server has updated state
+            saved_j = state.total_energy_saved_j
+            saved_tokens = state.total_tokens_saved
+            saved_hits = state.total_cache_hits
+            carbon_kwh = get_carbon()
+            saved_co2_g = (saved_j / 3_600_000.0) * carbon_kwh
+
+            try:
+                import requests
+                r = requests.get("http://127.0.0.1:8000/api/telemetry/live", timeout=0.5)
+                if r.status_code == 200:
+                    d = r.json()
+                    saved_j = d.get("total_energy_saved_j", saved_j)
+                    saved_tokens = d.get("total_tokens_saved", saved_tokens)
+                    saved_hits = d.get("total_cache_hits", saved_hits)
+                    saved_co2_g = d.get("total_carbon_saved_g", saved_co2_g)
+            except Exception:
+                pass
+
             ai_cpu = get_isolated_ai_cpu()
             power = get_total_system_power(ai_cpu)
             total_w = power["total_w"]
-            co2_mg_s = ((total_w / 3_600_000.0) * get_carbon()) * 1000.0
+            co2_mg_s = ((total_w / 3_600_000.0) * carbon_kwh) * 1000.0
 
             now_str = datetime.now().strftime("%H:%M:%S")
             print(
-                f"{now_str:<10} | "
-                f"{ai_cpu:>6.1f}% | "
-                f"{power['cpu_w']:>6.1f} W | "
-                f"{power['gpu_w']:>6.1f} W | "
-                f"{total_w:>8.1f} W | "
-                f"{co2_mg_s:>8.2f} mg/s"
+                f"{now_str:<8} | "
+                f"{ai_cpu:>5.1f}% | "
+                f"{total_w:>7.1f} W | "
+                f"{co2_mg_s:>9.2f} | "
+                f"{saved_j:>9.1f} J | "
+                f"{saved_co2_g:>10.5f} g | "
+                f"{saved_hits:>5} hits"
             )
             time.sleep(args.interval)
     except KeyboardInterrupt:
-        print("\n[!] Live telemetry stopped.\n")
+        print("\n" + "=" * 78)
+        print(" 📊 SESSION FINAL GREEN AUDIT:")
+        print(f" Total Electricity Saved: {state.total_energy_saved_j:.2f} Joules ({state.total_energy_saved_j / 3600.0:.4f} Watt-hours)")
+        print(f" Total Tokens Saved:      {state.total_tokens_saved} tokens")
+        print(f" Total Carbon Prevented:  {(state.total_energy_saved_j / 3_600_000.0) * get_carbon():.6f} gCO2")
+        print(f" 0-Watt Cache Hits:       {state.total_cache_hits}")
+        print("=" * 78 + "\n")
 
 
 def cmd_compress(args):

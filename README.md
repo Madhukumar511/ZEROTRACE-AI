@@ -5,7 +5,7 @@
 [![Cloud LLMs](https://img.shields.io/badge/Cloud_LLMs-Gemini_|_OpenAI_|_Groq_|_Claude-purple?style=for-the-badge)](https://github.com/Madhukumar511/ZEROTRACE-AI)
 [![Vector Cache](https://img.shields.io/badge/Cache-384D_Semantic_Memory_(0W)-00c853?style=for-the-badge)](https://github.com/Madhukumar511/ZEROTRACE-AI)
 [![Caveman Mode](https://img.shields.io/badge/Compression-Caveman_~65%25_Tokens-teal?style=for-the-badge)](https://github.com/Madhukumar511/ZEROTRACE-AI)
-[![Tests](https://img.shields.io/badge/Automated_Tests-41%2F41_Passing-brightgreen?style=for-the-badge&logo=pytest&logoColor=white)](https://github.com/Madhukumar511/ZEROTRACE-AI)
+[![Tests](https://img.shields.io/badge/Automated_Tests-43%2F43_Passing-brightgreen?style=for-the-badge&logo=pytest&logoColor=white)](https://github.com/Madhukumar511/ZEROTRACE-AI)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](LICENSE)
 
 > **Zero synthetic approximations. Real hardware telemetry. Real energy physics.**  
@@ -212,6 +212,7 @@ ZEROTRACE-AI/
 | :--- | :---: | :--- |
 | `/` | `GET` | Serves the interactive telemetry dashboard & Live Green Chat |
 | `/api/chat` | `POST` | **Unified Green Chat Gateway** (Vector cache check $\to$ Caveman $\to$ Model dispatch) |
+| `/v1/chat/completions` | `POST` | **OpenAI-Compatible Reverse Proxy** (For Cursor, LangChain, CLI agents with 0W Cache & Caveman) |
 | `/api/chat/providers` | `GET` | Lists available local models (Ollama) and cloud providers |
 | `/api/cache/stats` | `GET` | Returns vector cache size, cache hits, and cumulative energy saved |
 | `/api/compress` | `POST` | Compresses any prompt with Caveman & returns token/Joules/$CO_2$ savings |

@@ -243,3 +243,101 @@ def chat_endpoint(req: ChatRequest):
             "status": f"⚡ Processed via {provider.upper()} ({model_used})",
         },
     }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# OpenAI-Compatible Reverse Proxy (/v1/chat/completions)
+# Allows ANY coding agent, CLI, IDE plugin, or script to route traffic
+# through ZeroTrace AI's 0-Watt Cache and Caveman Compression automatically!
+# ─────────────────────────────────────────────────────────────────────────────
+
+v1_router = APIRouter(prefix="/v1", tags=["openai_compatible_proxy"])
+
+
+class OpenAIMessage(BaseModel):
+    role: str
+    content: str
+
+
+class OpenAIChatRequest(BaseModel):
+    model: Optional[str] = "gemini-1.5-flash"
+    messages: List[OpenAIMessage]
+    temperature: Optional[float] = 0.7
+    max_tokens: Optional[int] = None
+    stream: Optional[bool] = False
+
+
+@v1_router.post("/chat/completions")
+def openai_compat_chat_endpoint(req: OpenAIChatRequest):
+    """
+    Standard OpenAI-compatible proxy endpoint.
+    Intercepts calls from any LLM client (Cursor, LangChain, CLI agents):
+    1. Checks 384-D Semantic Vector Cache (0 Joules on hit).
+    2. Applies Caveman Token Compression on prompt.
+    3. Dispatches to Google Gemini (or specified model).
+    4. Auto-caches response into VectorDatastore.
+    """
+    if not req.messages:
+        raise HTTPException(400, "messages list cannot be empty")
+
+    # Extract user query (last user message)
+    user_query = ""
+    for m in reversed(req.messages):
+        if m.role.lower() == "user":
+            user_query = m.content.strip()
+            break
+    if not user_query:
+        user_query = req.messages[-1].content.strip()
+
+    model_name = req.model or "gemini-1.5-flash"
+    # Auto-detect provider from model name
+    provider = "gemini"
+    if "gpt" in model_name.lower():
+        provider = "openai"
+    elif "claude" in model_name.lower():
+        provider = "anthropic"
+    elif "llama" in model_name.lower() or "mixtral" in model_name.lower():
+        provider = "groq" if cloud_client.resolve_key("groq") else "ollama"
+
+    chat_req = ChatRequest(
+        message=user_query,
+        provider=provider,
+        model=model_name,
+        use_cache=True,
+        use_caveman=True,
+        caveman_intensity="full",
+    )
+    result = chat_endpoint(chat_req)
+
+    # Wrap in standard OpenAI response format
+    cmpl_id = f"chatcmpl-zt-{int(time.time()*1000)}"
+    return {
+        "id": cmpl_id,
+        "object": "chat.completion",
+        "created": int(time.time()),
+        "model": model_name,
+        "choices": [
+            {
+                "index": 0,
+                "message": {
+                    "role": "assistant",
+                    "content": result.get("answer", ""),
+                },
+                "finish_reason": "stop",
+            }
+        ],
+        "usage": {
+            "prompt_tokens": 0 if result.get("cache_hit") else estimate_token_count(result.get("prompt_sent", "")),
+            "completion_tokens": 0 if result.get("cache_hit") else estimate_token_count(result.get("answer", "")),
+            "total_tokens": 0 if result.get("cache_hit") else (
+                estimate_token_count(result.get("prompt_sent", "")) + estimate_token_count(result.get("answer", ""))
+            ),
+        },
+        "zerotrace_telemetry": {
+            "cache_hit": result.get("cache_hit", False),
+            "similarity_score": result.get("similarity_score", 0.0),
+            "energy_saved_j": result.get("energy_saved_j", 0.0),
+            "carbon_saved_g": result.get("carbon_saved_g", 0.0),
+            "tokens_saved": result.get("tokens_saved", 0),
+        },
+    }

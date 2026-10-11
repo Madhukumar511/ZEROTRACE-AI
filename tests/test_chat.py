@@ -119,3 +119,32 @@ def test_chat_mock_cloud_openai_success():
         assert data["success"] is True
         assert data["provider"] == "openai"
         assert "reverse_str" in data["answer"]
+
+
+def test_v1_openai_proxy_cache_hit():
+    """Tests standard OpenAI proxy /v1/chat/completions with 0-watt vector cache."""
+    resp = client.post("/v1/chat/completions", json={
+        "model": "gpt-4o-mini",
+        "messages": [
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": "what is zerotrace ai"},
+        ],
+    })
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["object"] == "chat.completion"
+    assert len(data["choices"]) > 0
+    assert "ZeroTrace AI" in data["choices"][0]["message"]["content"]
+    assert data["zerotrace_telemetry"]["cache_hit"] is True
+
+
+def test_telemetry_live_contains_cumulative_savings():
+    """Tests that live telemetry returns cumulative green savings."""
+    resp = client.get("/api/telemetry/live")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "total_energy_saved_j" in data
+    assert "total_carbon_saved_g" in data
+    assert "total_tokens_saved" in data
+    assert "total_cache_hits" in data
+    assert "cache_size" in data

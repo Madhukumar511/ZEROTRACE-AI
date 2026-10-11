@@ -5,7 +5,7 @@ from zerotrace.api.routes_telemetry import router as telemetry_router
 from zerotrace.api.routes_ollama import router as ollama_router
 from zerotrace.api.routes_compression import router as compression_router
 from zerotrace.api.routes_models import router as models_router
-from zerotrace.api.routes_chat import router as chat_router
+from zerotrace.api.routes_chat import router as chat_router, v1_router
 
 
 def create_app() -> FastAPI:
@@ -29,6 +29,7 @@ def create_app() -> FastAPI:
     app.include_router(ollama_router)
     app.include_router(compression_router)
     app.include_router(chat_router)
+    app.include_router(v1_router)
 
     return app
 
