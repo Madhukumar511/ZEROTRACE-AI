@@ -541,7 +541,7 @@ def main():
     chat_p = subparsers.add_parser("chat", help="Start interactive Green AI chat (default)")
     chat_p.add_argument("--continue", "-c", dest="continue_session", action="store_true", help="Resume most recent chat session")
     chat_p.add_argument("--session", "-s", type=str, help="Load a specific chat session by ID")
-    chat_p.add_argument("--provider", "-p", choices=["antigravity", "agy", "ollama", "gemini", "groq", "openai", "anthropic", "custom"], help="Inference provider")
+    chat_p.add_argument("--provider", "-p", type=str, help="Inference provider (antigravity, copilot, cursor, lmstudio, jan, ollama, gemini, groq, openai, anthropic)")
     chat_p.add_argument("--model", "-m", type=str, help="Model identifier")
     chat_p.add_argument("--key", "-k", type=str, help="API Key")
 
