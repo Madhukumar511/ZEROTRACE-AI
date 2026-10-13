@@ -151,10 +151,14 @@ def chat_endpoint(req: ChatRequest):
             power_w=current_w,
             carbon_gco2_kwh=carbon_kwh,
         )
-        prompt_to_send = comp_res["compressed_prompt"]
-        comp_metrics = comp_res["metrics"]
-        prompt_tokens_saved = comp_metrics.get("tokens_saved", 0)
-        state.total_tokens_saved += prompt_tokens_saved
+        compressed = comp_res.get("compressed_prompt", "").strip()
+        if compressed:
+            prompt_to_send = compressed
+            comp_metrics = comp_res["metrics"]
+            prompt_tokens_saved = comp_metrics.get("tokens_saved", 0)
+            state.total_tokens_saved += prompt_tokens_saved
+        else:
+            prompt_to_send = user_query
 
     # ─────────────────────────────────────────────────────────────
     # STEP 3: Dispatch to Model (Local or Cloud)

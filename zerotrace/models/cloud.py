@@ -212,20 +212,25 @@ class CloudLLMClient:
         if not (agy_bin and os.path.exists(agy_bin)):
             return {"success": False, "error": "Google Antigravity CLI ('agy') not found in PATH or ~/.local/bin"}
 
+        prompt = (prompt or "").strip() or "Hello"
+
         cmd = [agy_bin, "--disable-slash-commands"]
         if model and model != "default":
             cmd.extend(["--model", model])
         cmd.extend(["-p", prompt])
 
         t0 = time.time()
+        timeout_sec = max(self.timeout, 90)
         try:
-            res = subprocess.run(cmd, capture_output=True, text=True, timeout=self.timeout)
+            res = subprocess.run(cmd, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=timeout_sec)
             duration_s = time.time() - t0
             if res.returncode != 0:
                 err = res.stderr.strip() or f"agy exited with code {res.returncode}"
                 return {"success": False, "error": err}
 
-            text = res.stdout.strip()
+            import re
+            ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+            text = ansi_escape.sub('', res.stdout).strip()
             prompt_toks = estimate_token_count(prompt)
             completion_toks = estimate_token_count(text)
 
@@ -240,7 +245,7 @@ class CloudLLMClient:
                 "duration_s": round(duration_s, 3),
             }
         except subprocess.TimeoutExpired:
-            return {"success": False, "error": f"Antigravity CLI timed out after {self.timeout}s"}
+            return {"success": False, "error": f"Antigravity CLI timed out after {timeout_sec}s"}
         except Exception as e:
             return {"success": False, "error": f"Antigravity CLI execution error: {str(e)}"}
 

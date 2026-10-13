@@ -167,7 +167,10 @@ class CavemanCompressor:
 
         # Restore code and literals
         result = cls._restore_protected_blocks(result, protected)
-        return result.strip()
+        cleaned = result.strip()
+        # If all tokens were pruned (e.g. conversational greeting like "hi" or "hello"),
+        # keep the original trimmed prompt so we never produce an empty request!
+        return cleaned if cleaned else text.strip()
 
     @classmethod
     def get_system_prompt(cls, intensity: str = "full") -> str:
