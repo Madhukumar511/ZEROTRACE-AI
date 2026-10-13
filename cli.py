@@ -296,6 +296,8 @@ def cmd_chat(args=None):
 
     active_agent = disco_report["auto_connected"]["active_agent"]
     hw_source = disco_report["hardware"]["telemetry_source"]
+    offline_models = disco_report.get("offline_models", [])
+    offline_status = f"{len(offline_models)} Offline Models Ready" if offline_models else "Cloud/IDE Gateway Ready"
     ide_models = disco_report.get("ide_models", [])
     ide_status = f"{len(ide_models)} IDE Models Ready (Copilot, Cursor, LM Studio)" if ide_models else "None detected"
 
