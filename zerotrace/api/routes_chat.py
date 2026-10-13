@@ -205,6 +205,33 @@ def chat_endpoint(req: ChatRequest):
     # ─────────────────────────────────────────────────────────────
     # STEP 3: Dispatch to Model (Local or Cloud)
     # ─────────────────────────────────────────────────────────────
+    # Load session to inject multi-turn continuity
+    sess = None
+    if req.session_id:
+        try:
+            from zerotrace.core.session import session_manager
+            sess = session_manager.load_session(req.session_id)
+        except Exception:
+            sess = None
+
+    full_prompt_to_send = prompt_to_send
+    messages_payload = None
+
+    if sess and sess.get("messages"):
+        past_msgs = sess["messages"][-6:]  # Keep last 3 turns
+        messages_payload = []
+        for m in past_msgs:
+            messages_payload.append({"role": m["role"], "content": m["content"]})
+        messages_payload.append({"role": "user", "content": prompt_to_send})
+
+        context_parts = []
+        for m in past_msgs:
+            r = "User" if m.get("role") == "user" else "Assistant"
+            c = m.get("content", "").strip()
+            c_snippet = (c[:280] + "...") if len(c) > 280 else c
+            context_parts.append(f"{r}: {c_snippet}")
+        full_prompt_to_send = "Previous conversation:\n" + "\n".join(context_parts) + f"\n\nCurrent user request: {prompt_to_send}"
+
     answer_text = ""
     model_used = req.model or "default"
     cloud_usage = {}
@@ -218,7 +245,7 @@ def chat_endpoint(req: ChatRequest):
 
         res = ollama_client.generate(
             model=model_to_use,
-            prompt=prompt_to_send,
+            prompt=full_prompt_to_send,
             options=state.ollama_options,
         )
         if not res.get("success"):
@@ -229,11 +256,12 @@ def chat_endpoint(req: ChatRequest):
     elif provider in CLOUD_PROVIDERS:
         res = cloud_client.generate(
             provider=provider,
-            prompt=prompt_to_send,
+            prompt=full_prompt_to_send,
             model=req.model,
             api_key=req.api_key,
             base_url=req.base_url,
             conversation_id=req.conversation_id,
+            messages=messages_payload,
         )
         if not res.get("success"):
             raise HTTPException(400, res.get("error", f"{provider} generation failed"))

@@ -225,6 +225,36 @@ def dispatch_chat(
     return chat_endpoint(req)
 
 
+def print_session_history(session: dict):
+    """Displays the entire conversation history done using ZeroTrace."""
+    messages = session.get("messages", [])
+    if not messages:
+        print(f"\n [ℹ] Session {session['session_id']} is clean (0 previous messages).\n")
+        return
+
+    print("\n" + "─" * 78)
+    print(f" 📜 ZEROTRACE CHAT HISTORY (Session: {session['session_id']} | {session.get('provider', '').upper()})")
+    print("─" * 78)
+    for msg in messages:
+        role = msg.get("role", "user")
+        content = msg.get("content", "").strip()
+        if role == "user":
+            print(f"\n You > {content}")
+        elif role == "assistant":
+            print(f"\n ZeroTrace AI > {content}")
+            m = msg.get("metrics")
+            if m:
+                saved_tok = m.get("tokens_saved", 0)
+                saved_j = m.get("energy_saved_j", 0.0)
+                cache_hit = m.get("cache_hit", False)
+                if cache_hit:
+                    print(f" [🟢 100% Zero-Watt Cache Hit | Saved {saved_tok} tokens | {saved_j:.2f} J]")
+                elif saved_tok > 0:
+                    print(f" [⚡ Saved {saved_tok} tokens | {saved_j:.2f} J]")
+    print("─" * 78)
+    print(f" [✓] Resumed {len(messages)} messages from this ZeroTrace session.\n")
+
+
 def print_session_audit():
     """Prints final session cumulative savings audit."""
     carbon_kwh = get_carbon()
@@ -315,15 +345,12 @@ def cmd_chat(args=None):
     print("   • Caveman Prompt Compression   -> ~65% token drop on novel queries")
     print("   • Physical Telemetry Tracking  -> Real Watts, Joules & gCO2 calculated per turn")
     print("-" * 78)
-    print(" Commands: /continue  /sessions  /load [id]  /new  /provider [name]  /exit")
+    print(" Commands: /history  /continue  /sessions  /load [id]  /new  /provider [name]  /exit")
     print(" Type your prompt and press Enter to chat!")
     print("=" * 78 + "\n")
 
     if session.get("messages"):
-        print(f" [✓] Resumed existing session ({len(session['messages'])} past messages).")
-        last_turn = session["messages"][-1]
-        prev_txt = last_turn['content'][:65] + ("..." if len(last_turn['content']) > 65 else "")
-        print(f"     Last turn: \"{prev_txt}\"\n")
+        print_session_history(session)
     elif provider == "antigravity":
         print(" [⚡] Connected directly to Google Antigravity CLI (Gemini)!")
         print("     Zero API keys required. Real-time token compression and 0-Watt cache active.\n")
@@ -363,12 +390,15 @@ def cmd_chat(args=None):
             elif cmd == "/stats":
                 print_session_audit()
                 continue
+            elif cmd in ["/history", "/resume"]:
+                print_session_history(session)
+                continue
             elif cmd == "/clear":
                 os.system("clear" if os.name != "nt" else "cls")
                 continue
             elif cmd == "/sessions":
                 all_s = session_manager.list_sessions(10)
-                print("\n 📁 Past Chat Sessions:")
+                print("\n 📁 Past ZeroTrace Sessions:")
                 for s in all_s:
                     cur = " * (current)" if s["session_id"] == session["session_id"] else ""
                     print(f"   • {s['session_id']} | {s['provider']}:{s['model']} | {s['messages_count']} msgs{cur}")
@@ -384,7 +414,8 @@ def cmd_chat(args=None):
                         session = loaded
                         provider = session.get("provider", provider)
                         model = session.get("model", model)
-                        print(f" ✓ Switched to session {session['session_id']} ({len(session.get('messages', []))} messages)")
+                        print(f" ✓ Switched to session {session['session_id']}")
+                        print_session_history(session)
                     else:
                         print(f" [!] Session '{target}' not found. Type /sessions to list.")
                 else:
@@ -401,6 +432,7 @@ def cmd_chat(args=None):
                     provider = session.get("provider", provider)
                     model = session.get("model", model)
                     print(f" ✓ Resumed last session: {session['session_id']}")
+                    print_session_history(session)
                 continue
             elif cmd == "/provider":
                 if len(parts) > 1:

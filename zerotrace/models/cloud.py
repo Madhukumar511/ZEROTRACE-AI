@@ -3,7 +3,7 @@ import time
 import shutil
 import subprocess
 import requests
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 
 from zerotrace.compression.tokenizer import estimate_token_count
 
@@ -152,6 +152,7 @@ class CloudLLMClient:
         model: str = "gpt-4o-mini",
         api_key: Optional[str] = None,
         base_url: Optional[str] = None,
+        messages: Optional[List[Dict[str, str]]] = None,
     ) -> Dict[str, Any]:
         key = self.resolve_key(provider, api_key)
         if not key and provider not in ["custom", "lmstudio", "jan", "localai"]:
@@ -176,7 +177,7 @@ class CloudLLMClient:
         }
         payload = {
             "model": model,
-            "messages": [{"role": "user", "content": prompt}],
+            "messages": messages if messages else [{"role": "user", "content": prompt}],
             "temperature": 0.7,
         }
 
@@ -255,7 +256,7 @@ class CloudLLMClient:
         prompt: str,
         model: Optional[str] = None,
         conversation_id: Optional[str] = None,
-        effort: str = "low",
+        effort: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Calls Google Antigravity CLI (agy) non-interactively using system Google session."""
         agy_bin = shutil.which("agy") or os.path.expanduser("~/.local/bin/agy")
@@ -264,13 +265,16 @@ class CloudLLMClient:
 
         prompt = (prompt or "").strip() or "Hello"
 
-        cmd = [agy_bin, "--disable-slash-commands"]
-        if effort in ["low", "medium", "high"]:
+        cmd = [agy_bin, "--disable-slash-commands", "--dangerously-skip-permissions"]
+
+        target_model = model or "gemini-3.8-flash-high"
+        if target_model and target_model != "default":
+            cmd.extend(["--model", target_model])
+
+        # Do NOT pass --effort when target_model is flash-* as it conflicts with flash tiers
+        if effort and effort in ["low", "medium", "high", "xhigh", "max"] and "flash" not in target_model.lower():
             cmd.extend(["--effort", effort])
-        if model and model != "default":
-            cmd.extend(["--model", model])
-        if conversation_id:
-            cmd.extend(["--conversation", conversation_id])
+
         cmd.extend(["-p", prompt])
 
         t0 = time.time()
@@ -292,7 +296,7 @@ class CloudLLMClient:
                 "success": True,
                 "text": text,
                 "provider": "antigravity",
-                "model": model or "gemini-3.8-flash-high",
+                "model": target_model,
                 "conversation_id": conversation_id,
                 "prompt_tokens": prompt_toks,
                 "completion_tokens": completion_toks,
@@ -370,7 +374,8 @@ class CloudLLMClient:
         api_key: Optional[str] = None,
         base_url: Optional[str] = None,
         conversation_id: Optional[str] = None,
-        effort: str = "low",
+        effort: Optional[str] = None,
+        messages: Optional[List[Dict[str, str]]] = None,
     ) -> Dict[str, Any]:
         """Dispatches request to specified cloud or IDE provider."""
         provider = provider.lower().strip()
@@ -392,6 +397,7 @@ class CloudLLMClient:
                 model=model,
                 api_key=api_key,
                 base_url=base_url,
+                messages=messages,
             )
         else:
             return {"success": False, "error": f"Unsupported cloud or IDE provider: '{provider}'"}
