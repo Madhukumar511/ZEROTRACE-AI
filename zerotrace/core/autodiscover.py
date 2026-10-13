@@ -45,7 +45,9 @@ class AutoDiscoveryEngine:
                 })
 
         # 2. Local Model Directories (GGUF, PyTorch, SafeTensors)
+        from zerotrace.config import BASE_DIR
         search_dirs = [
+            str(BASE_DIR / "models"),
             os.path.abspath("./models"),
             os.path.abspath("../models"),
             os.path.expanduser("~/.ollama/models/manifests/registry.ollama.ai/library"),

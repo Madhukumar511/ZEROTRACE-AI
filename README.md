@@ -70,15 +70,31 @@ flowchart TD
 
 ZeroTrace AI is designed to run out of the box on any developer laptop with **zero manual setup** across Windows, macOS, and Linux.
 
-### 🌐 Universal Command (Any OS, Any Terminal)
-Run directly with zero installation:
+### 🌐 Universal Command (Any OS, Any Directory)
+
+Run from any terminal or folder:
 ```bash
-python -m zerotrace
-```
-Or install globally into your environment:
-```bash
-pip install -e .
+# Start interactive Green AI Chat:
 zerotrace
+# or
+python -m zerotrace
+
+# Start the Green Web Dashboard & API server:
+zerotrace ui
+
+# Stream real-time hardware watts & carbon:
+zerotrace live
+
+# Compress prompt tokens with Caveman (~65% reduction):
+zerotrace compress "Explain how transformers work..."
+
+# Audit hardware sensors, TDP, and Ollama daemon:
+zerotrace info
+```
+
+To enable the `zerotrace` binary globally across any path:
+```bash
+pip install -e /path/to/ZEROTRACE-AI
 ```
 
 > **🔍 Instant Auto-Discovery Engine:**  

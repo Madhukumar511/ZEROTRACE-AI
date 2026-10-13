@@ -146,6 +146,22 @@ def cmd_info(args):
     print("=" * 60 + "\n")
 
 
+def cmd_ui(args=None):
+    """Starts the ZeroTrace web dashboard and REST/SSE API server."""
+    import uvicorn
+    from zerotrace.config import HOST, PORT
+    port = getattr(args, "port", None) or PORT
+    host = getattr(args, "host", None) or HOST
+    print("\n" + "=" * 60)
+    print(" ⚡ ZEROTRACE AI — GREEN WEB DASHBOARD & API")
+    print("=" * 60)
+    print(f" Dashboard URL: http://localhost:{port}")
+    print(f" Network Bind:  http://{host}:{port}")
+    print(" Press Ctrl+C to stop.")
+    print("=" * 60 + "\n")
+    uvicorn.run("zerotrace.api.app:app", host=host, port=port, reload=False)
+
+
 def detect_default_provider():
     """Detects best available inference provider: Local Ollama, Offline weights, or configured Cloud LLMs."""
     from zerotrace.core.autodiscover import autodiscover
@@ -405,7 +421,7 @@ def main():
         return
 
     # If user runs `python cli.py "some prompt..."`, run one-shot prompt inference directly!
-    if len(sys.argv) == 2 and sys.argv[1] not in ["-h", "--help", "live", "compress", "info", "chat"]:
+    if len(sys.argv) == 2 and sys.argv[1] not in ["-h", "--help", "live", "compress", "info", "chat", "ui", "serve"]:
         cmd_one_shot(sys.argv[1])
         return
 
@@ -417,6 +433,15 @@ def main():
     chat_p.add_argument("--provider", "-p", choices=["ollama", "gemini", "groq", "openai", "anthropic", "custom"], help="Inference provider")
     chat_p.add_argument("--model", "-m", type=str, help="Model identifier")
     chat_p.add_argument("--key", "-k", type=str, help="API Key")
+
+    # UI / Dashboard command
+    ui_p = subparsers.add_parser("ui", help="Start the ZeroTrace green web dashboard and API server")
+    ui_p.add_argument("--port", type=int, default=8000, help="Port to bind (default: 8000)")
+    ui_p.add_argument("--host", type=str, default="0.0.0.0", help="Host interface (default: 0.0.0.0)")
+
+    serve_p = subparsers.add_parser("serve", help="Alias for 'ui'")
+    serve_p.add_argument("--port", type=int, default=8000, help="Port to bind (default: 8000)")
+    serve_p.add_argument("--host", type=str, default="0.0.0.0", help="Host interface (default: 0.0.0.0)")
 
     # Live command
     live_p = subparsers.add_parser("live", help="Stream live hardware watts and carbon emissions")
@@ -435,6 +460,8 @@ def main():
 
     if args.command == "chat" or args.command is None:
         cmd_chat(args)
+    elif args.command in ["ui", "serve"]:
+        cmd_ui(args)
     elif args.command == "live":
         cmd_live(args)
     elif args.command == "compress":
