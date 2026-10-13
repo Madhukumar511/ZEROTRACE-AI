@@ -31,10 +31,14 @@ class ChatRequest(BaseModel):
 
 @router.get("/chat/providers")
 def get_providers():
-    """Returns available local and cloud providers with their model choices."""
+    """Returns available local, IDE, and cloud providers with their model choices."""
+    from zerotrace.core.autodiscover import autodiscover
+
     ollama_online = ollama_client.is_online()
     ollama_models = ollama_client.list_models() if ollama_online else []
     ollama_model_names = [m["name"] for m in ollama_models]
+
+    ide_models = autodiscover.scan_ide_models()
 
     cloud_list = []
     for prov_id, prov_info in CLOUD_PROVIDERS.items():
@@ -56,6 +60,7 @@ def get_providers():
             "models": ollama_model_names,
             "default_model": ollama_model_names[0] if ollama_model_names else "llama3:latest",
         },
+        "ide_models": ide_models,
         "cloud": cloud_list,
         "cache_size": state.vector_cache.size(),
         "total_cache_hits": state.total_cache_hits,
@@ -241,7 +246,7 @@ def chat_endpoint(req: ChatRequest):
             "total_tokens": res.get("total_tokens", 0),
         }
     else:
-        raise HTTPException(400, f"Unknown provider: '{provider}'. Choose from: 'ollama', 'gemini', 'openai', 'groq', 'anthropic', 'custom'.")
+        raise HTTPException(400, f"Unknown provider: '{provider}'. Choose from: 'ollama', 'copilot', 'antigravity', 'lmstudio', 'jan', 'gemini', 'openai', 'groq', 'anthropic', 'custom'.")
 
     duration_s = max(time.time() - t_start, 0.01)
 

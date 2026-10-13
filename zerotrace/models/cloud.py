@@ -39,6 +39,39 @@ CLOUD_PROVIDERS = {
         "models": ["claude-3-5-sonnet-20241022", "claude-3-haiku-20240307"],
         "env_key": "ANTHROPIC_API_KEY",
     },
+    "copilot": {
+        "name": "GitHub Copilot (VS Code CLI Agent)",
+        "default_model": "gpt-4o",
+        "models": ["gpt-4o", "claude-3.5-sonnet", "o1-preview", "gpt-4o-mini"],
+        "env_key": None,
+    },
+    "cursor": {
+        "name": "Cursor Agent (IDE CLI)",
+        "default_model": "claude-3.5-sonnet",
+        "models": ["claude-3.5-sonnet", "gpt-4o", "cursor-small"],
+        "env_key": "CURSOR_API_KEY",
+    },
+    "lmstudio": {
+        "name": "LM Studio (IDE Server :1234)",
+        "default_model": "default",
+        "models": ["default"],
+        "env_key": None,
+        "base_url": "http://127.0.0.1:1234/v1",
+    },
+    "jan": {
+        "name": "Jan AI (IDE Server :1337)",
+        "default_model": "default",
+        "models": ["default"],
+        "env_key": None,
+        "base_url": "http://127.0.0.1:1337/v1",
+    },
+    "localai": {
+        "name": "LocalAI / vLLM (:8080)",
+        "default_model": "default",
+        "models": ["default"],
+        "env_key": None,
+        "base_url": "http://127.0.0.1:8080/v1",
+    },
     "custom": {
         "name": "Custom OpenAI-Compatible",
         "default_model": "default",
@@ -64,6 +97,11 @@ class CloudLLMClient:
         if provider in ["antigravity", "agy"]:
             agy_bin = shutil.which("agy") or os.path.expanduser("~/.local/bin/agy")
             return "antigravity_authenticated" if (agy_bin and os.path.exists(agy_bin)) else None
+        if provider in ["copilot", "github-copilot"]:
+            copilot_bin = shutil.which("copilot") or os.path.expanduser("~/.local/bin/copilot")
+            return "copilot_authenticated" if (copilot_bin and os.path.exists(copilot_bin)) else None
+        if provider in ["lmstudio", "jan", "localai"]:
+            return "local_ide_endpoint"
         env_var = CLOUD_PROVIDERS.get(provider, {}).get("env_key")
         if env_var:
             return os.environ.get(env_var, "").strip() or None
@@ -116,11 +154,17 @@ class CloudLLMClient:
         base_url: Optional[str] = None,
     ) -> Dict[str, Any]:
         key = self.resolve_key(provider, api_key)
-        if not key and provider != "custom":
+        if not key and provider not in ["custom", "lmstudio", "jan", "localai"]:
             return {"success": False, "error": f"{provider.capitalize()} API key missing. Set {CLOUD_PROVIDERS.get(provider, {}).get('env_key')} in .env or provide in request."}
 
         if provider == "groq":
             url = base_url or "https://api.groq.com/openai/v1/chat/completions"
+        elif provider == "lmstudio":
+            url = base_url or "http://127.0.0.1:1234/v1/chat/completions"
+        elif provider == "jan":
+            url = base_url or "http://127.0.0.1:1337/v1/chat/completions"
+        elif provider == "localai":
+            url = base_url or "http://127.0.0.1:8080/v1/chat/completions"
         elif provider == "openai":
             url = base_url or "https://api.openai.com/v1/chat/completions"
         else:
@@ -260,6 +304,64 @@ class CloudLLMClient:
         except Exception as e:
             return {"success": False, "error": f"Antigravity CLI execution error: {str(e)}"}
 
+    def call_copilot(
+        self,
+        prompt: str,
+        model: Optional[str] = None,
+        conversation_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Calls GitHub Copilot CLI non-interactively using system Copilot session."""
+        copilot_bin = shutil.which("copilot") or os.path.expanduser("~/.local/bin/copilot")
+        if not (copilot_bin and os.path.exists(copilot_bin)):
+            return {"success": False, "error": "GitHub Copilot CLI ('copilot') not found in PATH or ~/.local/bin"}
+
+        prompt = (prompt or "").strip() or "Hello"
+
+        cmd = [copilot_bin, "-p", prompt, "--allow-all"]
+        if model and model not in ["default", "copilot"]:
+            cmd.extend(["--model", model])
+        if conversation_id:
+            cmd.extend([f"--resume={conversation_id}"])
+
+        t0 = time.time()
+        timeout_sec = max(self.timeout, 60)
+        try:
+            res = subprocess.run(cmd, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=timeout_sec)
+            duration_s = time.time() - t0
+            if res.returncode != 0:
+                err = res.stderr.strip() or f"copilot exited with code {res.returncode}"
+                return {"success": False, "error": err}
+
+            import re
+            ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+            raw_text = ansi_escape.sub('', res.stdout).strip()
+
+            lines = []
+            for line in raw_text.splitlines():
+                if any(line.strip().startswith(prefix) for prefix in ["Changes ", "AI Credits ", "Tokens ", "Resume "]):
+                    continue
+                lines.append(line)
+            clean_text = "\n".join(lines).strip() or raw_text
+
+            prompt_toks = estimate_token_count(prompt)
+            completion_toks = estimate_token_count(clean_text)
+
+            return {
+                "success": True,
+                "text": clean_text,
+                "provider": "copilot",
+                "model": model or "gpt-4o",
+                "conversation_id": conversation_id,
+                "prompt_tokens": prompt_toks,
+                "completion_tokens": completion_toks,
+                "total_tokens": prompt_toks + completion_toks,
+                "duration_s": round(duration_s, 3),
+            }
+        except subprocess.TimeoutExpired:
+            return {"success": False, "error": f"Copilot CLI timed out after {timeout_sec}s"}
+        except Exception as e:
+            return {"success": False, "error": f"Copilot CLI execution error: {str(e)}"}
+
     def generate(
         self,
         provider: str,
@@ -270,18 +372,20 @@ class CloudLLMClient:
         conversation_id: Optional[str] = None,
         effort: str = "low",
     ) -> Dict[str, Any]:
-        """Dispatches request to specified cloud provider."""
+        """Dispatches request to specified cloud or IDE provider."""
         provider = provider.lower().strip()
         prov_info = CLOUD_PROVIDERS.get(provider, CLOUD_PROVIDERS.get("antigravity", CLOUD_PROVIDERS["openai"]))
         model = model or prov_info["default_model"]
 
         if provider in ["antigravity", "agy"]:
             return self.call_antigravity(prompt=prompt, model=model, conversation_id=conversation_id, effort=effort)
+        elif provider in ["copilot", "github-copilot"]:
+            return self.call_copilot(prompt=prompt, model=model, conversation_id=conversation_id)
         elif provider == "gemini":
             return self.call_gemini(prompt=prompt, model=model, api_key=api_key)
         elif provider == "anthropic":
             return self.call_anthropic(prompt=prompt, model=model, api_key=api_key)
-        elif provider in ["openai", "groq", "custom"]:
+        elif provider in ["openai", "groq", "custom", "lmstudio", "jan", "localai"]:
             return self.call_openai_compatible(
                 prompt=prompt,
                 provider=provider,
@@ -290,7 +394,7 @@ class CloudLLMClient:
                 base_url=base_url,
             )
         else:
-            return {"success": False, "error": f"Unsupported cloud provider: '{provider}'"}
+            return {"success": False, "error": f"Unsupported cloud or IDE provider: '{provider}'"}
 
 
 cloud_client = CloudLLMClient()

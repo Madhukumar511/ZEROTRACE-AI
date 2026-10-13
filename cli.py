@@ -143,6 +143,10 @@ def cmd_info(args):
     print(f" Ollama Daemon:        {'Connected' if ollama_client.is_online() else 'Not running'}")
     if models:
         print(f" Available Models:     {', '.join(m['name'] for m in models)}")
+    from zerotrace.core.autodiscover import autodiscover
+    ide_m = autodiscover.scan_ide_models()
+    if ide_m:
+        print(f" IDE Models:           {len(ide_m)} detected ({', '.join(m['name'] for m in ide_m[:4])})")
     print("=" * 60 + "\n")
 
 
@@ -292,13 +296,15 @@ def cmd_chat(args=None):
 
     active_agent = disco_report["auto_connected"]["active_agent"]
     hw_source = disco_report["hardware"]["telemetry_source"]
-    offline_status = f"{len(disco_report['offline_models'])} Offline Models Ready" if disco_report['offline_models'] else "Cloud Gateway Ready"
+    ide_models = disco_report.get("ide_models", [])
+    ide_status = f"{len(ide_models)} IDE Models Ready (Copilot, Cursor, LM Studio)" if ide_models else "None detected"
 
     print("\n" + "=" * 78)
     print(" ⚡ ZEROTRACE AI — UNIVERSAL GREEN CHAT GATEWAY")
     print("=" * 78)
     print(f" Agent Link:      {active_agent}")
     print(f" Offline Models:  {offline_status}")
+    print(f" IDE Models:      {ide_status}")
     print(f" Active Target:   {provider.upper()} ({model})")
     print(f" Telemetry Source:{hw_source} | Grid Carbon: {get_carbon():.1f} gCO2/kWh")
     print(f" Session ID:      {session['session_id']}")
@@ -319,6 +325,12 @@ def cmd_chat(args=None):
     elif provider == "antigravity":
         print(" [⚡] Connected directly to Google Antigravity CLI (Gemini)!")
         print("     Zero API keys required. Real-time token compression and 0-Watt cache active.\n")
+    elif provider == "copilot":
+        print(" [⚡] Connected directly to GitHub Copilot (VS Code CLI Agent)!")
+        print("     Zero API keys required. Real-time prompt compression and 0-Watt cache active.\n")
+    elif provider == "lmstudio":
+        print(" [⚡] Connected directly to LM Studio Local Server (:1234)!")
+        print("     Real-time prompt compression and 0-Watt cache active.\n")
     elif provider == "ollama" and not ollama_client.is_online():
         print(" [ℹ] Note: Local Ollama is not running.")
         print("     To use local models, run 'ollama serve' in another terminal.")
@@ -402,7 +414,7 @@ def cmd_chat(args=None):
                     session_manager.save_session(session)
                     print(f" ✓ Provider switched to: {provider.upper()} (default model: {model})")
                 else:
-                    print(" Usage: /provider <antigravity | ollama | gemini | groq | openai | anthropic>")
+                    print(" Usage: /provider <antigravity | copilot | lmstudio | jan | ollama | gemini | groq | openai | anthropic>")
                 continue
             elif cmd == "/model":
                 if len(parts) > 1:

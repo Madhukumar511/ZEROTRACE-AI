@@ -180,3 +180,76 @@ def test_telemetry_live_contains_cumulative_savings():
     assert "total_tokens_saved" in data
     assert "total_cache_hits" in data
     assert "cache_size" in data
+
+
+def test_ide_models_autodiscovery():
+    """Verify that scan_ide_models discovers IDE targets like Copilot, Cursor, LM Studio."""
+    from zerotrace.core.autodiscover import autodiscover
+    ide_models = autodiscover.scan_ide_models()
+    assert isinstance(ide_models, list)
+    # Check providers endpoint exposes ide_models
+    resp = client.get("/api/chat/providers")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "ide_models" in data
+    assert isinstance(data["ide_models"], list)
+
+
+def test_chat_mock_copilot_success():
+    """Verify provider='copilot' executes correctly through cloud_client and calculates savings."""
+    with patch("zerotrace.models.cloud.cloud_client.call_copilot") as mock_copilot:
+        mock_copilot.return_value = {
+            "success": True,
+            "text": "Copilot IDE CLI response",
+            "provider": "copilot",
+            "model": "gpt-4o",
+            "prompt_tokens": 15,
+            "completion_tokens": 8,
+            "total_tokens": 23,
+            "duration_s": 0.45,
+        }
+        resp = client.post("/api/chat", json={
+            "message": "can you explain how binary search works please",
+            "provider": "copilot",
+            "model": "gpt-4o",
+            "use_caveman": True,
+            "caveman_intensity": "full",
+            "use_cache": False,
+        })
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["success"] is True
+        assert data["provider"] == "copilot"
+        assert "Copilot IDE CLI response" in data["answer"]
+        assert data["tokens_saved"] > 0
+        mock_copilot.assert_called_once()
+
+
+def test_chat_mock_lmstudio_success():
+    """Verify provider='lmstudio' executes correctly via OpenAI-compatible route."""
+    with patch("zerotrace.models.cloud.cloud_client.call_openai_compatible") as mock_openai:
+        mock_openai.return_value = {
+            "success": True,
+            "text": "LM Studio local response",
+            "provider": "lmstudio",
+            "model": "qwen2.5-coder",
+            "prompt_tokens": 12,
+            "completion_tokens": 6,
+            "total_tokens": 18,
+            "duration_s": 0.2,
+        }
+        resp = client.post("/api/chat", json={
+            "message": "can you explain how quicksort works please",
+            "provider": "lmstudio",
+            "model": "qwen2.5-coder",
+            "use_caveman": True,
+            "caveman_intensity": "full",
+            "use_cache": False,
+        })
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["success"] is True
+        assert data["provider"] == "lmstudio"
+        assert "LM Studio local response" in data["answer"]
+        mock_openai.assert_called_once()
+
