@@ -178,6 +178,8 @@ def dispatch_chat(
     use_cache: bool = True,
     use_caveman: bool = True,
     caveman_intensity: str = "full",
+    session_id: str = None,
+    conversation_id: str = None,
 ):
     """
     Sends chat request to running ZeroTrace server (if active)
@@ -194,6 +196,8 @@ def dispatch_chat(
             "use_cache": use_cache,
             "use_caveman": use_caveman,
             "caveman_intensity": caveman_intensity,
+            "session_id": session_id,
+            "conversation_id": conversation_id,
         }
         r = requests.post("http://127.0.0.1:8000/api/chat", json=payload, timeout=60)
         if r.status_code == 200:
@@ -211,6 +215,8 @@ def dispatch_chat(
         use_cache=use_cache,
         use_caveman=use_caveman,
         caveman_intensity=caveman_intensity,
+        session_id=session_id,
+        conversation_id=conversation_id,
     )
     return chat_endpoint(req)
 
@@ -258,6 +264,8 @@ def cmd_chat(args=None):
     and compressed with Caveman (~65% token drop), with live energy & carbon tracking.
     """
     import os
+    from zerotrace.core.session import session_manager
+
     default_provider, default_model, disco_report = detect_default_provider()
     provider = getattr(args, "provider", None) or default_provider
     model = getattr(args, "model", None) or default_model
@@ -265,6 +273,22 @@ def cmd_chat(args=None):
     use_cache = True
     use_caveman = True
     api_key = getattr(args, "key", None)
+
+    # Initialize or resume session
+    session = None
+    if getattr(args, "continue_session", False):
+        session = session_manager.get_last_session()
+        if session:
+            provider = session.get("provider", provider)
+            model = session.get("model", model)
+    elif getattr(args, "session", None):
+        session = session_manager.load_session(args.session)
+        if session:
+            provider = session.get("provider", provider)
+            model = session.get("model", model)
+
+    if not session:
+        session = session_manager.create_session(provider=provider, model=model)
 
     active_agent = disco_report["auto_connected"]["active_agent"]
     hw_source = disco_report["hardware"]["telemetry_source"]
@@ -277,16 +301,22 @@ def cmd_chat(args=None):
     print(f" Offline Models:  {offline_status}")
     print(f" Active Target:   {provider.upper()} ({model})")
     print(f" Telemetry Source:{hw_source} | Grid Carbon: {get_carbon():.1f} gCO2/kWh")
+    print(f" Session ID:      {session['session_id']}")
     print(" ZeroTrace runs transparently in the background while you chat:")
     print("   • 384-D Semantic Vector Cache  -> 0-Watt instant recall on repeated queries")
     print("   • Caveman Prompt Compression   -> ~65% token drop on novel queries")
     print("   • Physical Telemetry Tracking  -> Real Watts, Joules & gCO2 calculated per turn")
     print("-" * 78)
-    print(" Commands: /provider [name]  /model [name]  /stats  /clear  /exit")
+    print(" Commands: /continue  /sessions  /load [id]  /new  /provider [name]  /exit")
     print(" Type your prompt and press Enter to chat!")
     print("=" * 78 + "\n")
 
-    if provider == "antigravity":
+    if session.get("messages"):
+        print(f" [✓] Resumed existing session ({len(session['messages'])} past messages).")
+        last_turn = session["messages"][-1]
+        prev_txt = last_turn['content'][:65] + ("..." if len(last_turn['content']) > 65 else "")
+        print(f"     Last turn: \"{prev_txt}\"\n")
+    elif provider == "antigravity":
         print(" [⚡] Connected directly to Google Antigravity CLI (Gemini)!")
         print("     Zero API keys required. Real-time token compression and 0-Watt cache active.\n")
     elif provider == "ollama" and not ollama_client.is_online():
@@ -299,6 +329,8 @@ def cmd_chat(args=None):
             prompt = input(f"\nYou [{provider}:{model}] > ").strip()
         except (KeyboardInterrupt, EOFError):
             print_session_audit()
+            print(f" 💾 Chat saved to: ~/.zerotrace/sessions/{session['session_id']}.json")
+            print(f"    To resume this conversation, run: zerotrace --continue\n")
             break
 
         if not prompt:
@@ -311,12 +343,50 @@ def cmd_chat(args=None):
 
             if cmd in ["/exit", "/quit", "/q"]:
                 print_session_audit()
+                print(f" 💾 Chat saved to: ~/.zerotrace/sessions/{session['session_id']}.json")
+                print(f"    To resume this conversation, run: zerotrace --continue\n")
                 break
             elif cmd == "/stats":
                 print_session_audit()
                 continue
             elif cmd == "/clear":
                 os.system("clear" if os.name != "nt" else "cls")
+                continue
+            elif cmd == "/sessions":
+                all_s = session_manager.list_sessions(10)
+                print("\n 📁 Past Chat Sessions:")
+                for s in all_s:
+                    cur = " * (current)" if s["session_id"] == session["session_id"] else ""
+                    print(f"   • {s['session_id']} | {s['provider']}:{s['model']} | {s['messages_count']} msgs{cur}")
+                    if s.get("preview"):
+                        print(f"     \"{s['preview']}\"")
+                print(" Switch to any session with: /load <session_id>\n")
+                continue
+            elif cmd == "/load":
+                if len(parts) > 1:
+                    target = parts[1]
+                    loaded = session_manager.load_session(target)
+                    if loaded:
+                        session = loaded
+                        provider = session.get("provider", provider)
+                        model = session.get("model", model)
+                        print(f" ✓ Switched to session {session['session_id']} ({len(session.get('messages', []))} messages)")
+                    else:
+                        print(f" [!] Session '{target}' not found. Type /sessions to list.")
+                else:
+                    print(" Usage: /load <session_id>")
+                continue
+            elif cmd == "/new":
+                session = session_manager.create_session(provider=provider, model=model)
+                print(f" ✓ Started new clean session: {session['session_id']}")
+                continue
+            elif cmd == "/continue":
+                last = session_manager.get_last_session()
+                if last:
+                    session = last
+                    provider = session.get("provider", provider)
+                    model = session.get("model", model)
+                    print(f" ✓ Resumed last session: {session['session_id']}")
                 continue
             elif cmd == "/provider":
                 if len(parts) > 1:
@@ -327,6 +397,9 @@ def cmd_chat(args=None):
                     elif provider == "ollama":
                         models = ollama_client.list_models() if ollama_client.is_online() else []
                         model = models[0]["name"] if models else "llama3:latest"
+                    session["provider"] = provider
+                    session["model"] = model
+                    session_manager.save_session(session)
                     print(f" ✓ Provider switched to: {provider.upper()} (default model: {model})")
                 else:
                     print(" Usage: /provider <antigravity | ollama | gemini | groq | openai | anthropic>")
@@ -334,6 +407,8 @@ def cmd_chat(args=None):
             elif cmd == "/model":
                 if len(parts) > 1:
                     model = parts[1]
+                    session["model"] = model
+                    session_manager.save_session(session)
                     print(f" ✓ Model set to: {model}")
                 else:
                     print(" Usage: /model <model_name>")
@@ -363,14 +438,18 @@ def cmd_chat(args=None):
                 continue
             elif cmd in ["/help", "/h", "/?"]:
                 print("\n Available Commands:")
-                print("   /provider <name>   Switch provider: ollama, gemini, groq, openai, anthropic")
+                print("   /continue          Resume most recent chat session")
+                print("   /sessions          List saved past conversations")
+                print("   /load <id>         Switch to a specific past conversation")
+                print("   /new               Start a fresh clean session")
+                print("   /provider <name>   Switch provider: antigravity, ollama, gemini, groq, openai")
                 print("   /model <name>      Change model identifier")
                 print("   /key <api_key>     Provide or update cloud API key")
                 print("   /cache <on|off>    Toggle 0-Watt Semantic Cache")
                 print("   /caveman <on|off>  Toggle Caveman prompt compression")
                 print("   /stats             Display session cumulative green impact audit")
                 print("   /clear             Clear terminal screen")
-                print("   /exit              Exit chat and display final session report\n")
+                print("   /exit              Exit chat and save session\n")
                 continue
             else:
                 print(f" Unknown command '{cmd}'. Type /help for available commands.")
@@ -387,6 +466,8 @@ def cmd_chat(args=None):
                 use_cache=use_cache,
                 use_caveman=use_caveman,
                 caveman_intensity=intensity,
+                session_id=session["session_id"],
+                conversation_id=session.get("agy_conversation_id"),
             )
 
             # Clear progress line
@@ -423,16 +504,31 @@ def main():
         cmd_chat()
         return
 
+    # Check for direct --continue / -c flag
+    if len(sys.argv) == 2 and sys.argv[1] in ["-c", "--continue"]:
+        class ContinueArgs:
+            continue_session = True
+            session = None
+            provider = None
+            model = None
+            key = None
+        cmd_chat(ContinueArgs())
+        return
+
     # If user runs `python cli.py "some prompt..."`, run one-shot prompt inference directly!
-    if len(sys.argv) == 2 and sys.argv[1] not in ["-h", "--help", "live", "compress", "info", "chat", "ui", "serve"]:
+    if len(sys.argv) == 2 and sys.argv[1] not in ["-h", "--help", "live", "compress", "info", "chat", "ui", "serve", "-c", "--continue"]:
         cmd_one_shot(sys.argv[1])
         return
 
     parser = argparse.ArgumentParser(description="Zerotrace AI - Green Hardware & Token Profiler CLI")
+    parser.add_argument("--continue", "-c", dest="continue_session", action="store_true", help="Resume most recent chat session")
+    parser.add_argument("--session", "-s", type=str, help="Load a specific chat session by ID")
     subparsers = parser.add_subparsers(dest="command", help="Sub-commands")
 
     # Chat command
     chat_p = subparsers.add_parser("chat", help="Start interactive Green AI chat (default)")
+    chat_p.add_argument("--continue", "-c", dest="continue_session", action="store_true", help="Resume most recent chat session")
+    chat_p.add_argument("--session", "-s", type=str, help="Load a specific chat session by ID")
     chat_p.add_argument("--provider", "-p", choices=["antigravity", "agy", "ollama", "gemini", "groq", "openai", "anthropic", "custom"], help="Inference provider")
     chat_p.add_argument("--model", "-m", type=str, help="Model identifier")
     chat_p.add_argument("--key", "-k", type=str, help="API Key")

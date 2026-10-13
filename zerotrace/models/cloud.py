@@ -206,7 +206,13 @@ class CloudLLMClient:
         except Exception as e:
             return {"success": False, "error": f"Anthropic request failed: {str(e)}"}
 
-    def call_antigravity(self, prompt: str, model: Optional[str] = None) -> Dict[str, Any]:
+    def call_antigravity(
+        self,
+        prompt: str,
+        model: Optional[str] = None,
+        conversation_id: Optional[str] = None,
+        effort: str = "low",
+    ) -> Dict[str, Any]:
         """Calls Google Antigravity CLI (agy) non-interactively using system Google session."""
         agy_bin = shutil.which("agy") or os.path.expanduser("~/.local/bin/agy")
         if not (agy_bin and os.path.exists(agy_bin)):
@@ -215,8 +221,12 @@ class CloudLLMClient:
         prompt = (prompt or "").strip() or "Hello"
 
         cmd = [agy_bin, "--disable-slash-commands"]
+        if effort in ["low", "medium", "high"]:
+            cmd.extend(["--effort", effort])
         if model and model != "default":
             cmd.extend(["--model", model])
+        if conversation_id:
+            cmd.extend(["--conversation", conversation_id])
         cmd.extend(["-p", prompt])
 
         t0 = time.time()
@@ -239,6 +249,7 @@ class CloudLLMClient:
                 "text": text,
                 "provider": "antigravity",
                 "model": model or "gemini-3.8-flash-high",
+                "conversation_id": conversation_id,
                 "prompt_tokens": prompt_toks,
                 "completion_tokens": completion_toks,
                 "total_tokens": prompt_toks + completion_toks,
@@ -256,6 +267,8 @@ class CloudLLMClient:
         model: Optional[str] = None,
         api_key: Optional[str] = None,
         base_url: Optional[str] = None,
+        conversation_id: Optional[str] = None,
+        effort: str = "low",
     ) -> Dict[str, Any]:
         """Dispatches request to specified cloud provider."""
         provider = provider.lower().strip()
@@ -263,7 +276,7 @@ class CloudLLMClient:
         model = model or prov_info["default_model"]
 
         if provider in ["antigravity", "agy"]:
-            return self.call_antigravity(prompt=prompt, model=model)
+            return self.call_antigravity(prompt=prompt, model=model, conversation_id=conversation_id, effort=effort)
         elif provider == "gemini":
             return self.call_gemini(prompt=prompt, model=model, api_key=api_key)
         elif provider == "anthropic":

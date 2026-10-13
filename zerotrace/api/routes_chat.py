@@ -17,10 +17,12 @@ router = APIRouter(prefix="/api", tags=["chat"])
 
 class ChatRequest(BaseModel):
     message: str = Field(..., description="User prompt or question")
-    provider: str = Field("ollama", description="Provider: 'ollama', 'gemini', 'openai', 'groq', 'anthropic', 'custom'")
+    provider: str = Field("ollama", description="Provider: 'antigravity', 'ollama', 'gemini', 'openai', 'groq', 'anthropic', 'custom'")
     model: Optional[str] = Field(None, description="Model identifier (e.g. 'llama3:latest', 'gemini-1.5-flash', 'gpt-4o-mini')")
     api_key: Optional[str] = Field(None, description="API Key for cloud provider (optional if configured in environment)")
     base_url: Optional[str] = Field(None, description="Custom base URL for OpenAI-compatible endpoints")
+    session_id: Optional[str] = Field(None, description="ZeroTrace persistent session ID")
+    conversation_id: Optional[str] = Field(None, description="Backend agent conversation ID for multi-turn continuity")
     use_caveman: bool = Field(True, description="Enable Caveman prompt compression to save tokens and energy")
     caveman_intensity: str = Field("full", description="Caveman compression intensity: 'lite', 'full', 'ultra'")
     use_cache: bool = Field(True, description="Enable Semantic Vector Cache to answer with 0W on similar past queries")
@@ -73,6 +75,29 @@ def get_cache_stats():
     }
 
 
+@router.get("/chat/sessions")
+def get_chat_sessions():
+    """Returns list of recent persisted chat sessions."""
+    from zerotrace.core.session import session_manager
+    return {
+        "success": True,
+        "sessions": session_manager.list_sessions(),
+    }
+
+
+@router.get("/chat/sessions/{session_id}")
+def get_chat_session(session_id: str):
+    """Loads a specific persisted chat session by ID."""
+    from zerotrace.core.session import session_manager
+    sess = session_manager.load_session(session_id)
+    if not sess:
+        raise HTTPException(404, f"Session '{session_id}' not found")
+    return {
+        "success": True,
+        "session": sess,
+    }
+
+
 @router.post("/chat")
 def chat_endpoint(req: ChatRequest):
     """
@@ -117,7 +142,7 @@ def chat_endpoint(req: ChatRequest):
             state.total_tokens_saved += tokens_saved
 
             best_record = cache_eval["best_match"]
-            return {
+            hit_payload = {
                 "success": True,
                 "cache_hit": True,
                 "answer": best_record.get("answer", ""),
@@ -129,6 +154,8 @@ def chat_endpoint(req: ChatRequest):
                 "energy_saved_j": energy_saved_j,
                 "carbon_saved_g": round(carbon_saved_g, 6),
                 "duration_ms": round((time.time() - t_start) * 1000.0, 2),
+                "session_id": req.session_id,
+                "conversation_id": req.conversation_id,
                 "metrics": {
                     "energy_cost_j": 0.0,
                     "gpu_watts": 0.0,
@@ -136,6 +163,16 @@ def chat_endpoint(req: ChatRequest):
                     "status": "🟢 100% Zero-Watt Cache Hit",
                 },
             }
+            if req.session_id:
+                try:
+                    from zerotrace.core.session import session_manager
+                    sess = session_manager.load_session(req.session_id)
+                    if sess:
+                        session_manager.append_message(sess, role="user", content=user_query)
+                        session_manager.append_message(sess, role="assistant", content=hit_payload["answer"], metrics=hit_payload)
+                except Exception:
+                    pass
+            return hit_payload
 
     # ─────────────────────────────────────────────────────────────
     # STEP 2: Caveman Prompt Compression
@@ -191,6 +228,7 @@ def chat_endpoint(req: ChatRequest):
             model=req.model,
             api_key=req.api_key,
             base_url=req.base_url,
+            conversation_id=req.conversation_id,
         )
         if not res.get("success"):
             raise HTTPException(400, res.get("error", f"{provider} generation failed"))
@@ -228,7 +266,7 @@ def chat_endpoint(req: ChatRequest):
     state.total_energy_saved_j += energy_saved_j
     carbon_saved_g = (energy_saved_j / 3_600_000.0) * carbon_kwh
 
-    return {
+    ret_payload = {
         "success": True,
         "cache_hit": False,
         "answer": answer_text,
@@ -241,12 +279,26 @@ def chat_endpoint(req: ChatRequest):
         "carbon_saved_g": round(carbon_saved_g, 6),
         "duration_s": round(duration_s, 2),
         "cloud_usage": cloud_usage,
+        "session_id": req.session_id,
+        "conversation_id": req.conversation_id,
         "metrics": {
             "caveman_compressed": req.use_caveman,
             "tokens_saved": prompt_tokens_saved,
             "status": f"⚡ Processed via {provider.upper()} ({model_used})",
         },
     }
+
+    if req.session_id:
+        try:
+            from zerotrace.core.session import session_manager
+            sess = session_manager.load_session(req.session_id)
+            if sess:
+                session_manager.append_message(sess, role="user", content=user_query)
+                session_manager.append_message(sess, role="assistant", content=answer_text, metrics=ret_payload)
+        except Exception:
+            pass
+
+    return ret_payload
 
 
 # ─────────────────────────────────────────────────────────────────────────────
