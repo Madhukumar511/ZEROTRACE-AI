@@ -1,10 +1,20 @@
 import os
 import time
+import shutil
+import subprocess
 import requests
 from typing import Dict, Any, Optional
 
+from zerotrace.compression.tokenizer import estimate_token_count
+
 # Supported cloud providers and their standard default models
 CLOUD_PROVIDERS = {
+    "antigravity": {
+        "name": "Google Antigravity CLI (Gemini)",
+        "default_model": "gemini-3.8-flash-high",
+        "models": ["gemini-3.8-flash-high", "gemini-3.8-flash-medium", "claude-sonnet-4-6"],
+        "env_key": None,
+    },
     "gemini": {
         "name": "Google Gemini",
         "default_model": "gemini-1.5-flash",
@@ -51,6 +61,9 @@ class CloudLLMClient:
     def resolve_key(self, provider: str, provided_key: Optional[str] = None) -> Optional[str]:
         if provided_key and provided_key.strip():
             return provided_key.strip()
+        if provider in ["antigravity", "agy"]:
+            agy_bin = shutil.which("agy") or os.path.expanduser("~/.local/bin/agy")
+            return "antigravity_authenticated" if (agy_bin and os.path.exists(agy_bin)) else None
         env_var = CLOUD_PROVIDERS.get(provider, {}).get("env_key")
         if env_var:
             return os.environ.get(env_var, "").strip() or None
@@ -193,6 +206,44 @@ class CloudLLMClient:
         except Exception as e:
             return {"success": False, "error": f"Anthropic request failed: {str(e)}"}
 
+    def call_antigravity(self, prompt: str, model: Optional[str] = None) -> Dict[str, Any]:
+        """Calls Google Antigravity CLI (agy) non-interactively using system Google session."""
+        agy_bin = shutil.which("agy") or os.path.expanduser("~/.local/bin/agy")
+        if not (agy_bin and os.path.exists(agy_bin)):
+            return {"success": False, "error": "Google Antigravity CLI ('agy') not found in PATH or ~/.local/bin"}
+
+        cmd = [agy_bin, "--disable-slash-commands"]
+        if model and model != "default":
+            cmd.extend(["--model", model])
+        cmd.extend(["-p", prompt])
+
+        t0 = time.time()
+        try:
+            res = subprocess.run(cmd, capture_output=True, text=True, timeout=self.timeout)
+            duration_s = time.time() - t0
+            if res.returncode != 0:
+                err = res.stderr.strip() or f"agy exited with code {res.returncode}"
+                return {"success": False, "error": err}
+
+            text = res.stdout.strip()
+            prompt_toks = estimate_token_count(prompt)
+            completion_toks = estimate_token_count(text)
+
+            return {
+                "success": True,
+                "text": text,
+                "provider": "antigravity",
+                "model": model or "gemini-3.8-flash-high",
+                "prompt_tokens": prompt_toks,
+                "completion_tokens": completion_toks,
+                "total_tokens": prompt_toks + completion_toks,
+                "duration_s": round(duration_s, 3),
+            }
+        except subprocess.TimeoutExpired:
+            return {"success": False, "error": f"Antigravity CLI timed out after {self.timeout}s"}
+        except Exception as e:
+            return {"success": False, "error": f"Antigravity CLI execution error: {str(e)}"}
+
     def generate(
         self,
         provider: str,
@@ -203,10 +254,12 @@ class CloudLLMClient:
     ) -> Dict[str, Any]:
         """Dispatches request to specified cloud provider."""
         provider = provider.lower().strip()
-        prov_info = CLOUD_PROVIDERS.get(provider, CLOUD_PROVIDERS["openai"])
+        prov_info = CLOUD_PROVIDERS.get(provider, CLOUD_PROVIDERS.get("antigravity", CLOUD_PROVIDERS["openai"]))
         model = model or prov_info["default_model"]
 
-        if provider == "gemini":
+        if provider in ["antigravity", "agy"]:
+            return self.call_antigravity(prompt=prompt, model=model)
+        elif provider == "gemini":
             return self.call_gemini(prompt=prompt, model=model, api_key=api_key)
         elif provider == "anthropic":
             return self.call_anthropic(prompt=prompt, model=model, api_key=api_key)

@@ -1166,7 +1166,8 @@ footer { text-align:center; padding:2.5rem 2rem; border-top:1px solid rgba(255,2
       <div>
         <label class="form-lbl">Model Provider</label>
         <select id="chat-provider" onchange="onChatProviderChange()" style="width:100%;padding:.45rem;background:var(--bg-panel);border:1px solid rgba(255,255,255,0.15);border-radius:6px;color:#fff;font-family:var(--mono);font-size:.82rem;">
-          <option value="gemini" selected>🌐 Google Gemini (Flash / Pro)</option>
+          <option value="antigravity" selected>✨ Google Antigravity CLI (Gemini 3.8)</option>
+          <option value="gemini">🌐 Google Gemini (Flash / Pro)</option>
           <option value="groq">⚡ Groq (Ultra-Fast LPU)</option>
           <option value="openai">🤖 OpenAI (GPT-4o / Mini)</option>
           <option value="anthropic">🧠 Anthropic Claude (Sonnet / Haiku)</option>
@@ -2045,6 +2046,11 @@ function init3D(){
 let chatProvidersData = null;
 
 const CLOUD_MODEL_OPTIONS = {
+  antigravity: [
+    { val: 'gemini-3.8-flash-high', label: 'gemini-3.8-flash-high (Active Google Session)' },
+    { val: 'gemini-3.8-flash-medium', label: 'gemini-3.8-flash-medium (Fast)' },
+    { val: 'claude-sonnet-4-6', label: 'claude-sonnet-4-6 (Antigravity Thinking)' },
+  ],
   gemini: [
     { val: 'gemini-1.5-flash', label: 'gemini-1.5-flash (Fast & Green)' },
     { val: 'gemini-1.5-pro', label: 'gemini-1.5-pro (Deep Reasoning)' },
@@ -2090,7 +2096,7 @@ function onChatProviderChange() {
   const savedKey = localStorage.getItem('zt_key_' + prov) || '';
   keyInput.value = savedKey;
 
-  if (prov === 'ollama') {
+  if (prov === 'ollama' || prov === 'antigravity') {
     keyContainer.style.display = 'none';
   } else {
     keyContainer.style.display = 'block';

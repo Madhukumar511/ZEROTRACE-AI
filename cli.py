@@ -286,10 +286,13 @@ def cmd_chat(args=None):
     print(" Type your prompt and press Enter to chat!")
     print("=" * 78 + "\n")
 
-    if provider == "ollama" and not ollama_client.is_online():
+    if provider == "antigravity":
+        print(" [⚡] Connected directly to Google Antigravity CLI (Gemini)!")
+        print("     Zero API keys required. Real-time token compression and 0-Watt cache active.\n")
+    elif provider == "ollama" and not ollama_client.is_online():
         print(" [ℹ] Note: Local Ollama is not running.")
         print("     To use local models, run 'ollama serve' in another terminal.")
-        print("     Or switch to Cloud Gemini/Groq/OpenAI: type '/provider gemini'\n")
+        print("     Or switch to Antigravity/Cloud: type '/provider antigravity'\n")
 
     while True:
         try:
@@ -326,7 +329,7 @@ def cmd_chat(args=None):
                         model = models[0]["name"] if models else "llama3:latest"
                     print(f" ✓ Provider switched to: {provider.upper()} (default model: {model})")
                 else:
-                    print(" Usage: /provider <ollama | gemini | groq | openai | anthropic>")
+                    print(" Usage: /provider <antigravity | ollama | gemini | groq | openai | anthropic>")
                 continue
             elif cmd == "/model":
                 if len(parts) > 1:
@@ -430,7 +433,7 @@ def main():
 
     # Chat command
     chat_p = subparsers.add_parser("chat", help="Start interactive Green AI chat (default)")
-    chat_p.add_argument("--provider", "-p", choices=["ollama", "gemini", "groq", "openai", "anthropic", "custom"], help="Inference provider")
+    chat_p.add_argument("--provider", "-p", choices=["antigravity", "agy", "ollama", "gemini", "groq", "openai", "anthropic", "custom"], help="Inference provider")
     chat_p.add_argument("--model", "-m", type=str, help="Model identifier")
     chat_p.add_argument("--key", "-k", type=str, help="API Key")
 

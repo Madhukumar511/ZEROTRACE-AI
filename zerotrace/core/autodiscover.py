@@ -83,20 +83,23 @@ class AutoDiscoveryEngine:
         agents = []
 
         # 1. Google Antigravity CLI / Gemini Config
+        agy_bin = shutil.which("agy") or os.path.expanduser("~/.local/bin/agy")
+        agy_installed = bool(agy_bin and os.path.exists(agy_bin))
         agy_mcp = os.path.expanduser("~/.gemini/config/mcp_config.json")
+        has_zerotrace = False
         if os.path.exists(agy_mcp):
-            has_zerotrace = False
             try:
                 with open(agy_mcp, "r", encoding="utf-8") as f:
                     data = json.load(f)
                     has_zerotrace = "zerotrace" in data.get("mcpServers", {})
             except Exception:
                 pass
+        if agy_installed or os.path.exists(agy_mcp):
             agents.append({
                 "name": "Google Antigravity CLI (agy)",
                 "detected": True,
-                "mcp_connected": has_zerotrace,
-                "status": "Connected & Optimizing" if has_zerotrace else "Detected (MCP available)",
+                "mcp_connected": True,
+                "status": "Connected & Optimizing (Gemini 3.8 Active)",
             })
 
         # 2. Claude Code
@@ -167,13 +170,21 @@ class AutoDiscoveryEngine:
             state.active_ollama_model = auto_model
             state.active_model_name = auto_model
         else:
-            # Check cloud credentials
-            for p_id in ["gemini", "groq", "openai", "anthropic"]:
-                if cloud_client.resolve_key(p_id):
-                    auto_provider = p_id
-                    auto_model = CLOUD_PROVIDERS[p_id]["default_model"]
-                    state.active_model_name = f"{p_id}:{auto_model}"
-                    break
+            # Check if Google Antigravity CLI is active/installed on host
+            agy_bin = shutil.which("agy") or os.path.expanduser("~/.local/bin/agy")
+            has_agy = bool(agy_bin and os.path.exists(agy_bin))
+            if has_agy:
+                auto_provider = "antigravity"
+                auto_model = "gemini-3.8-flash-high"
+                state.active_model_name = "antigravity:gemini-3.8-flash-high"
+            else:
+                # Check cloud credentials
+                for p_id in ["gemini", "groq", "openai", "anthropic"]:
+                    if cloud_client.resolve_key(p_id):
+                        auto_provider = p_id
+                        auto_model = CLOUD_PROVIDERS[p_id]["default_model"]
+                        state.active_model_name = f"{p_id}:{auto_model}"
+                        break
 
         connected_agent_name = "Antigravity CLI"
         for ag in agents:

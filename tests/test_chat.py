@@ -18,6 +18,7 @@ def test_get_chat_providers():
     assert data["local"]["id"] == "ollama"
 
     cloud_ids = [c["id"] for c in data["cloud"]]
+    assert "antigravity" in cloud_ids
     assert "gemini" in cloud_ids
     assert "openai" in cloud_ids
     assert "groq" in cloud_ids
@@ -119,6 +120,37 @@ def test_chat_mock_cloud_openai_success():
         assert data["success"] is True
         assert data["provider"] == "openai"
         assert "reverse_str" in data["answer"]
+
+
+def test_chat_mock_antigravity_success():
+    """Testing chat endpoint routing with Google Antigravity provider."""
+    mock_resp = {
+        "success": True,
+        "text": "Antigravity Gemini response with token savings.",
+        "provider": "antigravity",
+        "model": "gemini-3.8-flash-high",
+        "prompt_tokens": 15,
+        "completion_tokens": 10,
+        "total_tokens": 25,
+        "duration_s": 0.42,
+    }
+
+    with patch("zerotrace.models.cloud.CloudLLMClient.call_antigravity", return_value=mock_resp):
+        resp = client.post("/api/chat", json={
+            "message": "can you explain how photosynthesis works please",
+            "provider": "antigravity",
+            "model": "gemini-3.8-flash-high",
+            "use_caveman": True,
+            "caveman_intensity": "full",
+            "use_cache": False,
+        })
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["success"] is True
+        assert data["cache_hit"] is False
+        assert data["provider"] == "antigravity"
+        assert "Antigravity Gemini response" in data["answer"]
+        assert data["tokens_saved"] > 0
 
 
 def test_v1_openai_proxy_cache_hit():
