@@ -2,8 +2,9 @@ import os
 from pathlib import Path
 
 # Paths
-BASE_DIR = Path(__file__).resolve().parent.parent
-INDEX_HTML_PATH = BASE_DIR / "index.html"
+PACKAGE_DIR = Path(__file__).resolve().parent
+BASE_DIR = PACKAGE_DIR.parent
+INDEX_HTML_PATH = (PACKAGE_DIR / "index.html") if (PACKAGE_DIR / "index.html").exists() else (BASE_DIR / "index.html")
 
 # Networking & Service URLs
 HOST = os.getenv("ZEROTRACE_HOST", "0.0.0.0")

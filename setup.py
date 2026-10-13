@@ -15,6 +15,10 @@ setup(
         "numpy>=1.24.0",
         "pydantic>=2.0.0",
     ],
+    include_package_data=True,
+    package_data={
+        "zerotrace": ["*.html", "index.html"],
+    },
     entry_points={
         "console_scripts": [
             "zerotrace=cli:main",
